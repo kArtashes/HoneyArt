@@ -1,0 +1,395 @@
+/* Global box-sizing */
+*, *::before, *::after {
+    box-sizing: border-box;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "TikTok Sans", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings:
+        "slnt" 0,
+        "wdth" 100;
+  }
+  
+  header {
+    width: 100%;
+    background-color: #212121;
+  }
+  
+  #header {
+    width: 100%;
+  }
+  
+  #header_menu {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+  }
+  
+  #section-1 {
+    display: flex;
+    gap: 10px;
+  }
+  
+  #section-1 a {
+    margin: 10px;
+    text-decoration: none;
+    font: inherit;
+    font-size: 16px;
+    color: #ECE6D4;
+  }
+
+  #section-1 a {
+    position: relative;
+    text-decoration: none;
+  }
+  
+  #section-1 a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 2px;
+    width: 0;
+    background-color: #ECE6D4;
+    transition: width 0.3s ease;
+  }
+  
+  #section-1 a:hover::after {
+    width: 100%;
+  }
+  
+
+  
+  .logo {
+    font-size: clamp(0.5rem, 3vw + 1rem, 3rem);
+    color: #d38f12;
+    flex-shrink: 0;
+  }
+  
+  .logo .honey {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+  }
+  
+  .logo .art {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+  }
+  
+  #section-2 {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  
+  #section-2 button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  
+#basket-icon {
+    width: 30px;
+    height: auto;
+}
+#account-icon {
+    width: 25px;
+    height: auto;
+}
+#search-icon {
+    width: 30px;
+    height: auto;
+}
+  
+  #hamburger {
+    width: 40px;
+    cursor: pointer;
+  }
+  
+  #hamburger img {
+    width: 100%;
+    height: auto;
+  }
+  
+  #mobile-search {
+    width: 40px;
+    display: none;
+  }
+  
+  #mobile-search img {
+    width: 100%;
+    height: auto;
+  }
+  
+  #section-0 {
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  @media (max-width: 768px) {
+    #section-0 {
+      display: flex;
+    }
+  
+    #search-icon {
+      display: none;
+    }
+  
+    #section-1 {
+      display: none;
+      flex-direction: column;
+      background-color: #ffffff;
+      width: 100%;
+    }
+  
+    #header_menu.show {
+      display: grid;
+      grid-template-columns: 1fr;
+      justify-items: end;
+      gap: 10px;
+      height: auto;
+    }
+  
+    #cross_page {
+      display: flex;
+      align-items: center;
+    }
+  
+    #pages {
+      display: grid;
+    }
+  
+    body.menu-open #hamburger {
+      display: none;
+    }
+  
+    body.menu-open #cross {
+      display: block;
+    }
+  
+    #header_menu a {
+      padding: 5px;
+    }
+
+    #header_menu form {
+      margin: 20px 0;
+    }
+  
+    #header_menu div {
+      padding: 0px 5px;
+    }
+  
+    #mobile-search {
+      display: block;
+    }
+  }
+  @media(max-width: 420px){
+    #basket-icon {
+        width: 30px;
+        height: auto;
+    }
+    #account-icon {
+        width: 23px;
+        height: auto;
+    }
+    #hamburger {
+        width: 35px;
+        cursor: pointer;
+      }
+      
+      
+      #mobile-search {
+        width: 27px;
+      }
+}
+  
+
+
+
+/* Sidebar */
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px; /* hide initially */
+  width: 250px;
+  height: 100%;
+  background-color: #000;
+  color: white;
+  z-index: 1002;
+  padding: 20px;
+  transition: left 0.3s ease;
+}
+
+/* Overlay */
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5); /* dark transparent */
+  z-index: 1000;
+  display: none; /* hidden by default */
+}
+
+#sidebar div img {
+  width: 20px;
+}
+#sidebar {
+  display: flex;
+  flex-direction: column;
+}
+#sidebar {
+  display: flex;
+  gap: 10px;
+}
+
+#sidebar a {
+  margin: 10px;
+  text-decoration: none;
+  font: inherit;
+  font-size: 16px;
+  color: #ECE6D4;
+}
+
+#sidebar a {
+  position: relative;
+  text-decoration: none;
+}
+
+#sidebar a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 2px;
+  width: 0;
+  background-color: #ECE6D4;
+  transition: width 0.3s ease;
+}
+
+#sidebar a:hover::after {
+  width: 100%;
+}
+
+/* Show states */
+#sidebar.active {
+  left: 0;
+}
+
+#overlay.active {
+  display: block;
+}
+
+
+/* Basket design================================ */
+.basket-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.basket-panel {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 400px;
+  height: 100%;
+  background: #fff;
+  z-index: 100;
+  transition: right 0.3s ease;
+  box-shadow: -2px 0 5px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.basket-panel.open {
+  right: 0;
+}
+
+/* basket div1----------------------------- */
+#basket-heading {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px black solid;
+}
+.basket-panel button {
+  padding: 0px;
+  margin: 0px;
+  transition: all 0.5s ease;
+}
+#basket-heading button:hover{
+  transform: scale(1.2);
+}
+#basket-heading span {
+  display: block;
+    font-size: 1.17em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+    font-weight: bold;
+    unicode-bidi: isolate;
+}
+.basket-icon .badge {
+  background-color: red;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 50%;
+  font-size: 12px;
+  margin-left: 5px;
+}
+/* basket div2---------------------------------- */
+.free-sheeping-block {
+  padding: 16px;
+  border-bottom: 1px solid black;
+}
+.free-sheeping-success {
+  display: none;
+}
+/* progress element --------- */
+progress {
+  width: 95%;
+  height: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  appearance: none; /* Remove default styles */
+}
+
+/* WebKit (Chrome, Safari) */
+progress::-webkit-progress-bar {
+  background-color: #eee;
+  border-radius: 999px;
+}
+
+progress::-webkit-progress-value {
+  background-color: black;
+  border-radius: 999px;
+}
+
+/* Firefox */
+progress::-moz-progress-bar {
+  background-color: black;
+  border-radius: 999px;
+}
+
+
+
+
+@media (max-width: 400px){
+  .basket-panel {
+    width: 100%;
+  }
+}

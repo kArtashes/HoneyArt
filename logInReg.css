@@ -1,0 +1,99 @@
+#login-reg-body {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-top: 5%;
+}
+
+#login-reg-body div{
+    margin-left: 0%;
+    margin-bottom: 10px;
+}
+
+#login-slider-div {
+    width: 50%;
+}
+
+#login-div {
+    margin-top: -5%;
+    padding-left: 10%;
+}
+
+#log-reg-buttons {
+    display: flex;
+}
+
+#log-reg-buttons button.active {
+    color: #F9A825; 
+    font-size: 16px;
+}
+
+#log-reg-buttons button{
+    border: none;
+    background: none;
+}
+
+#login-reg-body form input {
+    width: 200px;
+    height: 30px;
+    border: 3px solid black;
+    padding: 7px;
+    border-radius: 30px;
+    margin-bottom: 3%;
+}
+
+#login-reg-body form #remember{
+    width: 15px;
+    height: 15px;
+    accent-color: #F9A825;
+}
+
+#login-reg-body form label{
+    align-items: center;
+}
+#login-reg-body form label span{
+    position: relative;
+    top: -2px;
+}
+#login-reg-body form button {
+    width: 200px;
+    height: 40px;
+    padding: 10px;
+    margin: 0;
+    border-radius: 30px;
+    background-color: #F9A825;
+    color: white;
+    font-weight: 500;
+    display: block;
+
+}
+.form-container { 
+    display: none; 
+}
+
+.form-container.active { 
+    display: block; 
+}
+
+button { 
+    margin: 5px; 
+    padding: 10px; 
+    cursor: pointer
+}
+#login-slider-div {
+    box-sizing: border-box;
+}
+@media(max-width: 600px){
+    #login-reg-body {
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    #login-slider-div {
+        width: 100%;
+    }
+    /* #login-slider-div {
+        display: none;
+    } */
+}

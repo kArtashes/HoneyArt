@@ -1,0 +1,61 @@
+#personal-account{ 
+    padding: 40px 0; 
+} 
+.personal-account-control{ 
+    display: flex; 
+    justify-content: space-between; 
+    margin-left: 15%; 
+} 
+.personal-account-control h1{ 
+    margin-top: 0; 
+    margin-left: 0; 
+} 
+.person-data div{ 
+    display: flex; 
+    margin-right: 5%; 
+} 
+.person-data div a{ 
+    height: 50px; 
+    width: 100px; 
+    font-size: 20px; 
+    background: none; 
+    border-radius: 30px; 
+    margin-top: 5px; 
+    margin-right: 20px; 
+} 
+.person-control-buttons{ 
+    display: flex; 
+} 
+#personal-data-control{ 
+    justify-content: space-between; 
+ 
+} 
+.person-username{ 
+    font-size: 30px; 
+    margin-left: 15%; 
+} 
+.person-personal-data{ 
+    margin-top: 30px; 
+    font-size: 20px; 
+    display: flex; 
+    margin-left: 10%; 
+    align-items: center; 
+     
+} 
+.person-personal-data span{ 
+    display: inline-block; 
+    vertical-align: middle; 
+    border: 2px solid gray; 
+    border-radius: 30px; 
+    padding: 10px 15px; 
+    margin-left: 5%; 
+ 
+} 
+button{ 
+    border: none;
+    background: none;
+    text-decoration: none; 
+    color: black; 
+    font-weight: bold; 
+    font-size: large;
+}
