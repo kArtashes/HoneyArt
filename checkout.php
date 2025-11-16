@@ -89,4 +89,18 @@ try {
 
 // Clear cart after checkout
 $conn->query("DELETE FROM cart WHERE user_id = $user_id");
+
+
+// Վերադարձ կայք
+if (isset($_SERVER['HTTP_REFERER'])) {
+    $redirect_url = $_SERVER['HTTP_REFERER'];
+} else {
+    $redirect_url = 'products.php'; // fallback
+}
+
+// Optional: add a message
+$redirect_url .= (strpos($redirect_url, '?') === false ? '?' : '&') . 'message=Product added to cart';
+
+header("Location: $redirect_url");
+exit();
 ?>

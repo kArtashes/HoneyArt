@@ -47,7 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->close();
 
         // Վերադարձ կայք
-        header("Location: products.php?message=Product added to cart.");
+        if (isset($_SERVER['HTTP_REFERER'])) {
+            $redirect_url = $_SERVER['HTTP_REFERER'];
+        } else {
+            $redirect_url = 'products.php'; // fallback
+        }
+        
+        // Optional: add a message
+        $redirect_url .= (strpos($redirect_url, '?') === false ? '?' : '&') . 'message=Product added to cart';
+        
+        header("Location: $redirect_url");
         exit();
     } else {
         die("Invalid data.");

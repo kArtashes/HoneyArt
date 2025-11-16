@@ -32,22 +32,34 @@ while ($row = $imagesResult->fetch_assoc()) {
 }
 include('header.php');
 ?>    
-<div class="product-detail">
-    <h1><?php echo htmlspecialchars($product['name']); ?></h1>
-    <div class="slider" id="slider">
-        <button class="nav-btn left" onclick="prevImage()">&#10094;</button>
-        <img id="mainImage" src="image.php?id=<?php echo $product['id']; ?>" alt="Product Image">
-        <button class="nav-btn right" onclick="nextImage()">&#10095;</button>
+<div id="product">
+    <div id="product-photos">
+        <div id="slider">
+            <button class="nav-btn left" onclick="prevImage()">&#10094;</button>
+            <img id="mainImage" src="image.php?id=<?php echo $product['id']; ?>" alt="Product Image">
+            <button class="nav-btn right" onclick="nextImage()">&#10095;</button>
+        </div>
+        <div class="thumbnails">
+            <img src="image.php?id=<?php echo $product['id']; ?>" class="active" onclick="showImage(0)">
+            <?php foreach ($extraImages as $index => $imgId): ?>
+                <img src="image_secondary.php?id=<?php echo $imgId; ?>" onclick="showImage(<?php echo $index + 1; ?>)">
+            <?php endforeach; ?>
+        </div>
     </div>
-    <div class="thumbnails">
-        <img src="image.php?id=<?php echo $product['id']; ?>" class="active" onclick="showImage(0)">
-        <?php foreach ($extraImages as $index => $imgId): ?>
-            <img src="image_secondary.php?id=<?php echo $imgId; ?>" onclick="showImage(<?php echo $index + 1; ?>)">
-        <?php endforeach; ?>
+    <div id="product-details">
+        <p><?php echo htmlspecialchars($product['name']); ?></p>
+
+        <div id="price-add">
+            <div class="price">$<?php echo number_format($product['price'], 2); ?></div>
+            <form method="POST" action="add_to_cart.php">
+                <input type="hidden" name="product_id" value="<?php echo $_GET['id'] ?>">
+                <button type="submit" id="product-add">Quick add</button>
+            </form>
+        </div>
+
+
+        <div class="description"><?php echo nl2br(htmlspecialchars($product['description'])); ?></div>
     </div>
-    <div class="price">$<?php echo number_format($product['price'], 2); ?></div>
-    <div class="description"><?php echo nl2br(htmlspecialchars($product['description'])); ?></div>
-    <div class="back"><a href="products.php">← Back to Products</a></div>
 </div>
 
 <script>

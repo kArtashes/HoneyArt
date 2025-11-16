@@ -26,7 +26,7 @@
                 <h2>Contact</h2>
                 <div class='footer-contact-section'>
                     <img src="./images/phone.png" alt="" />
-                    <span>+374 98 669 324</span>
+                    <span>+374 95 616 112</span>
                 </div>
                 <div class='footer-contact-section'>
                     <img src="./images/mail.png" alt="" />

@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="header.css">
     <link rel="stylesheet" href="logInReg.css">
     <link rel="stylesheet" href="footer.css">
@@ -15,8 +16,10 @@
     <link rel="stylesheet" href="products.css">
     <link rel="stylesheet" href="product.css">
     <link rel="stylesheet" href="cart.css">
+    <link rel="stylesheet" href="support.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no">
     <title>Document</title>
 </head>
 <body>
@@ -31,8 +34,8 @@
 
                 <div id="section-1">
                     <a href="products.php">Products</a>
-                    <a href="">Blog</a>
-                    <a href="">Support</a>
+                    <a href="blog.php">Blog</a>
+                    <a href="support.php">Support</a>
                 </div>
 
                 <div class="logo">
@@ -53,7 +56,9 @@
 
     <!-- Basket Panel -->
      <?php 
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
      ?>
     <div class="basket-panel">
         <div id="basket-heading">
@@ -111,15 +116,15 @@
                     $total_price = $ola['total_price'] ?? 0;
                 }
             ?>
-            <div class="cart-summary">Total: <span class="total-price">$<?php echo number_format($total_price, 0); ?></span></div>            
+            <div class="cart-summary"><span>Subtotal</span> <span class="total-price">$<?php echo number_format($total_price, 0); ?></span></div>            
 
 
             <?php
                 $free_shipping_limit = 40000;
                 $amount_left = max($free_shipping_limit - $total_price, 0);
             ?>
-            <form action="checkout.php" method="post">
-                <button type="submit" class="checkout-btn">Checkout</button>
+            <form action="checkout.php" method="post" id="checkout-form">
+                <button type="submit" class="checkout-btn">CHECK OUT</button>
             </form>
         </div>
     </div>

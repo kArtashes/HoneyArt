@@ -3,7 +3,7 @@ session_start();
 
 // Check if already logged in
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-    header("Location: admin.php");
+    header("Location: admin_add_product.php");
     exit;
 }
 
@@ -18,7 +18,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($username === $valid_username && $password === $valid_password) {
         $_SESSION["loggedin"] = true;
-        header("Location: admin.php");
+        header("Location: admin_add_product.php");
         exit;
     } else {
         $error = "Invalid username or password!";
