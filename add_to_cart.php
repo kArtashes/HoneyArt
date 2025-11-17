@@ -4,7 +4,7 @@ session_start();
 // Ստուգում ենք՝ մուտք գործած է, թե ոչ
 if (!isset($_SESSION['user_id'])) {
     // Եթե չէ՝ հետ ենք ուղարկում login էջ
-    header("Location: login.php?message=Please login to add products to cart.");
+    header("Location: logInReg.php?message=Please login to add products to cart.");
     exit();
 }
 

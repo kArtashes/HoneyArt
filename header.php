@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="product.css">
     <link rel="stylesheet" href="cart.css">
     <link rel="stylesheet" href="support.css">
+    <link rel="stylesheet" href="blogs.css">
+    <link rel="stylesheet" href="blog.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="format-detection" content="telephone=no">
@@ -34,7 +36,7 @@
 
                 <div id="section-1">
                     <a href="products.php">Products</a>
-                    <a href="blog.php">Blog</a>
+                    <a href="blogs.php">Blog</a>
                     <a href="support.php">Support</a>
                 </div>
 
