@@ -9,7 +9,7 @@ include('header.php');
 
 
 <div id="post_general_image">
-    <img src="./images/post_general.png" alt="">
+    <img src="./images/blog-head-image.jpg" alt="">
     <div>
         <span>Blog page</span>
     </div>
@@ -25,10 +25,6 @@ include('header.php');
                     <?php endif; ?>
                     <h2><?php echo htmlspecialchars($row['title']); ?></h2>
                     <p><?php echo htmlspecialchars($row['description'])?></p>
-                    <form method="POST">
-                        <input type="hidden" name="post_id" value="<?php echo $row['id'] ?>">
-                        <button type="submit">See more</button>
-                    </form>
                 </div>
             <?php endwhile; ?>
         <?php else: ?>

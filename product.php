@@ -1,4 +1,9 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+
 // Database connection
 $conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
 if ($conn->connect_error) {
@@ -30,7 +35,56 @@ $extraImages = [];
 while ($row = $imagesResult->fetch_assoc()) {
     $extraImages[] = $row['id']; // store only IDs of extra images
 }
+echo '<pre>';
+var_dump($_SESSION);
+echo '</pre>';
 include('header.php');
+function isRecentlyViewed(mysqli $conn, int $userId, int $productId): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM recently_viewed
+        WHERE user_id = ? AND product_id = ?
+        LIMIT 1
+    ");
+
+    $stmt->bind_param("ii", $userId, $productId);
+    $stmt->execute();
+    $stmt->store_result();
+
+    return $stmt->num_rows > 0;
+}
+
+function addRecentlyViewed(mysqli $conn, int $userId, int $productId): bool
+{
+    $sql = "
+        INSERT INTO recently_viewed (user_id, product_id, viewed_at)
+        VALUES (?, ?, NOW())
+        ON DUPLICATE KEY UPDATE
+            viewed_at = NOW()
+    ";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $userId, $productId);
+
+    return $stmt->execute();
+}
+if(isRecentlyViewed($conn, $_SESSION['user_id'], $product['id'])){
+    $sql = "
+        UPDATE recently_viewed
+        SET viewed_at = NOW()
+        WHERE user_id = ? AND product_id = ?
+    ";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $userId, $productId);
+
+    $stmt->execute();
+}
+else{
+    addRecentlyViewed($conn, $_SESSION['user_id'], $product['id']);
+}
+
 ?>    
 <div id="product">
     <div id="product-photos">
@@ -50,15 +104,33 @@ include('header.php');
         <p><?php echo htmlspecialchars($product['name']); ?></p>
 
         <div id="price-add">
-            <div class="price">$<?php echo number_format($product['price'], 2); ?></div>
+            <div class="price">֏<?php echo number_format($product['price'], 0); ?></div>
             <form method="POST" action="add_to_cart.php">
                 <input type="hidden" name="product_id" value="<?php echo $_GET['id'] ?>">
-                <button type="submit" id="product-add">Quick add</button>
+                <button type="submit" id="product-add">Add to basket</button>
             </form>
         </div>
+        <?php
+        $content = $product['description'];
+        
+        // Replace literal "\r\n" sequences with <br>
+        $content = str_replace("\\r\\n", "
+        ", $content);
+        
+        // Optionally replace remaining \r or \n just in case
+        $content = str_replace(["\\r","\\n"], "<br>", $content);
+        
+        // Remove slashes if any (from magic quotes or insert method)
+        $content = stripslashes($content);
+        
+        // Decode HTML entities (if any)
+        $content = html_entity_decode($content);
 
+        // Decode HTML entities (if any)
+        $content = html_entity_decode($content);
+        ?>
 
-        <div class="description"><?php echo nl2br(htmlspecialchars($product['description'])); ?></div>
+        <div class="description"><?php echo nl2br(htmlspecialchars($content)); ?></div>
     </div>
 </div>
 

@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $host = 'localhost';
 $username = 'root';
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
                 setcookie("remember_token", $token, time() + (86400 * 30), "/", "", false, true);
             }
 
-            header("Location: personalAccount.php");
+            header("Location: account.php");
             exit();
         } else {
             $error = urlencode("Wrong password. Please try again.");

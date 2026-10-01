@@ -5,7 +5,9 @@ ini_set('display_errors', 1);
 
 
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: adminlogin.php");
     exit;
@@ -201,7 +203,7 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
 <body>
 
 <h1>Admin Panel - HoneyArt</h1>
-<p><a href="logout.php">Logout</a> | <a href="admin_add_blog.php">Add blog</a></p>
+<p><a href="logout.php">Logout</a> | <a href="admin_add_blog.php">Add blog</a> | <a href="admin_orders.php">Orders</a></p>
 
 <h2><?php echo $product ? "Edit Product" : "Add New Product"; ?></h2>
 

@@ -70,6 +70,7 @@
     flex-direction: column;
     text-align: center;
     transition: all 0.3s ease; /* Smooth animation */
+    position: relative;
 }
 
 .product:hover {
@@ -100,6 +101,25 @@
       "wdth" 100;
 
 }
+
+.wishlist-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    font-weight: 700;
+    font-size: 20px;
+    transition: all 0.3s ease;
+    color: #d69c1c;
+}
+.wishlist-btn:hover {
+    font-size: 30px;
+    font-weight: 900;
+    transform: scale(1.05);
+    animation-duration: 1s;
+}
+
+
 @media (max-width: 750px) {
     .product {
       width: 49.5%;

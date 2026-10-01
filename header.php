@@ -19,6 +19,9 @@
     <link rel="stylesheet" href="support.css">
     <link rel="stylesheet" href="blogs.css">
     <link rel="stylesheet" href="blog.css">
+    <link rel="stylesheet" href="search_form.css">
+    <!-- <link rel="stylesheet" href="aboutUs.css"> -->
+    <link rel="stylesheet" href="accountstyle.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="format-detection" content="telephone=no">
@@ -31,7 +34,7 @@
             <div id="header_menu">
                 <div id="section-0">
                     <div id="hamburger" onclick="openMenu()"><img src="./images/burgerManu.png" alt=""></div>
-                    <div id="mobile-search"><img src="./images/search-icon.png" alt=""></div>
+                    <div id="mobile-search"><img src="./images/search-icon.png" alt="" onclick="searchShow()"></div>
                 </div>
 
                 <div id="section-1">
@@ -39,19 +42,33 @@
                     <a href="blogs.php">Blog</a>
                     <a href="support.php">Support</a>
                 </div>
-
-                <div class="logo">
-                    <span class="honey">Honey</span><span class="art">Art</span>
-                </div>
+                <a href="home.php" style="text-decoration: none;">
+                    <div class="logo">
+                        <span class="honey">Honey</span><span class="art">Art</span>
+                    </div>
+                </a>
 
                 <div id="section-2">
-                    <button><img id="search-icon" src="./images/search-icon.png" alt=""></button>
+                    <button onclick="searchShow()"><img id="search-icon" src="./images/search-icon.png" alt=""></button>
                     <button class="basket-icon" onclick="openBasket()"><img id="basket-icon" src="./images/basket.png" alt=""></button>
-                    <button onclick="window.location.href='personalAccount.php'"><img id="account-icon" src="./images/personalAccount.png" alt=""></button>
+                    <button onclick="window.location.href='account.php'"><img id="account-icon" src="./images/personalAccount.png" alt=""></button>
                 </div>
             </div>
         </div>
     </header>
+
+    <?php 
+        $host = 'localhost';
+        $username = 'root';
+        $password = "root";
+        $db_name = 'honey_art_db';
+        $conn = new mysqli($host, $username, $password, $db_name);
+
+        if ($conn->connect_error) {
+            die('error: ' . $conn->connect_error);
+        }
+    ?>
+
 
     <!-- Overlay -->
     <div class="basket-overlay" onclick="closeBasket()"></div>
@@ -90,10 +107,10 @@
         <div class="free-sheeping-block">
             <?php if($total_price >= $free_shipping_limit): ?>
                 <span class="free-sheeping-success">Congratulations! Your order qualifies for free shipping</span>
-                <span class="free-sheeping-default" style="display:none;">You are <span><?php echo number_format($amount_left,2); ?>$</span> away from free shipping.</span>
+                <span class="free-sheeping-default" style="display:none;">You are <span><?php echo number_format($amount_left,2); ?>֏</span> away from free shipping.</span>
             <?php else: ?>
                 <span class="free-sheeping-success" style="display:none;">Congratulations! Your order qualifies for free shipping</span>
-                <span class="free-sheeping-default">You are <span><?php echo number_format($amount_left); ?></span>$ away from free shipping.</span>
+                <span class="free-sheeping-default">You are <span><?php echo number_format($amount_left); ?></span>֏ away from free shipping.</span>
             <?php endif; ?>
 
             <progress value="<?php echo $total_price; ?>" max="<?php echo $free_shipping_limit; ?>"></progress>
@@ -103,7 +120,7 @@
         
         <?php 
             include('cart.php');
-            ?>
+        ?>
         <div class="basket-footer">
             <?php
                 $basket_user_id = $_SESSION['user_id'] ?? 0;
@@ -118,7 +135,7 @@
                     $total_price = $ola['total_price'] ?? 0;
                 }
             ?>
-            <div class="cart-summary"><span>Subtotal</span> <span class="total-price">$<?php echo number_format($total_price, 0); ?></span></div>            
+            <div class="cart-summary"><span>Subtotal</span> <span class="total-price">֏<?php echo number_format($total_price, 0); ?></span></div>            
 
 
             <?php
@@ -138,12 +155,18 @@
     <div id="sidebar">
         <div class="close-btn" onclick="closeMenu()"><img src="./images/crossManu.png" alt=""></div>
         <a href="products.php">Products</a>
-        <a href="">Blog</a>
-        <a href="">Support</a>
+        <a href="blogs.php">Blog</a>
+        <a href="support.php">Support</a>
+        <a href="aboutUs.php">About us</a>
     </div>
 
     <!-- Dark Overlay -->
     <div id="overlay" onclick="closeMenu()"></div>
+
+
+    <?php include('search_form.php');?>
+
+
 
     <script>
         function openMenu() {
@@ -187,7 +210,7 @@
 
                 // Update total price
                 const totalPriceEl = document.querySelector('.total-price');
-                if (totalPriceEl) totalPriceEl.textContent = '$' + total_price.toLocaleString();
+                if (totalPriceEl) totalPriceEl.textContent = '֏' + total_price.toLocaleString();
 
                 // Update item quantity or remove
                 if (quantity === 0 || action === 'remove') {
@@ -245,6 +268,5 @@
         });
 
         
-
     </script>
     

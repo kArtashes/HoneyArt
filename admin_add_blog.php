@@ -2,7 +2,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: adminlogin.php");
     exit;
@@ -41,7 +43,7 @@ if (isset($_POST['save'])) {
                 WHERE id=?
             ");
 
-            $stmt->bind_param("bsssi", $image_data, $image_type, $description, $content, $id);
+            $stmt->bind_param("bssssi", $title, $image_data, $image_type, $description, $content, $id);
 
         } else {
 
@@ -51,7 +53,7 @@ if (isset($_POST['save'])) {
                 WHERE id=?
             ");
 
-            $stmt->bind_param("bsssi", $title, $description, $content, $id);
+            $stmt->bind_param("sssi", $title, $description, $content, $id);
         }
 
         $stmt->execute();
@@ -90,6 +92,7 @@ if (isset($_GET['edit'])) {
     $res = $conn->query("SELECT * FROM blog_posts WHERE id=$id");
     $post = $res->fetch_assoc();
 }
+
 
 
 
@@ -163,31 +166,44 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
       tinymce.init({
         selector: '#mytextarea',
         plugins: 'table lists link image code',
-        toolbar: 'undo redo | bold italic | table tablecellprops tableprops | alignleft aligncenter alignright | code',
-        menubar: 'file edit insert view format table tools help'
+        toolbar: 'undo redo | bold italic | table tablecellprops tableprops | alignleft aligncenter alignright | code | image',
+        menubar: 'file edit insert view format table tools help',
+        image_dimensions: true,
+        image_caption: true,
+        object_resizing: true,
+        automatic_uploads: false
     });
     </script>
 </head>
 <body> 
     <h1>Admin Panel - HoneyArt</h1>
-    <p><a href="logout.php">Logout</a> | <a href="admin_add_product.php">Add product</a></p>
+    <p><a href="logout.php">Logout</a> | <a href="admin_add_product.php">Add product</a> | <a href="admin_orders.php">Orders</a></p>
 
 
     <form method="post" enctype="multipart/form-data">
-        <input type="hidden" name="id" value="<?php echo $product['id'] ?? ''; ?>">
-        <p>Title:</p>
-        <input name="title" type="text">
-        <p>Main Image:</p>
-        <input type="file" name="image_file" accept="image/*" />
-        <p>Description: </p>
-        <input type="text" name="description">
-        <div>
-            <textarea id="mytextarea" name="content"></textarea>
-        </div>
+    <input type="hidden" name="id" value="<?php echo $post['id'] ?? ''; ?>">
 
-        <button type="submit" name="save">Send</button>
+    <p>Title:</p>
+    <input name="title" type="text" value="<?php echo $post['title'] ?? ''; ?>">
 
-    </form>
+    <p>Main Image:</p>
+    <?php if (!empty($post['image_data'])): ?>
+        <img src="post_image.php?id=<?php echo $post['id']; ?>" class="thumbnail" />
+        <br><br>
+    <?php endif; ?>
+    <input type="file" name="image_file" accept="image/*" />
+
+    <p>Description:</p>
+    <input type="text" name="description" value="<?php echo $post['description'] ?? ''; ?>">
+
+    <p>Content:</p>
+    <textarea id="mytextarea" name="content"><?php echo $post['content'] ?? ''; ?></textarea>
+
+    <button type="submit" name="save">
+        <?php echo isset($post) ? "Update" : "Create"; ?>
+    </button>
+</form>
+
 
     <h2>Posts</h2>
 

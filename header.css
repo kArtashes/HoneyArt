@@ -247,6 +247,7 @@
 #sidebar {
   display: flex;
   flex-direction: column;
+  z-index: 9999;
 }
 #sidebar {
   display: flex;

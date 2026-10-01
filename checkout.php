@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $host = 'localhost';
 $username = 'root';
 $password = "root";
@@ -22,7 +24,7 @@ $user = $user_query->fetch_assoc();
 
 // Fetch cart items
 $cart_query = $conn->query("
-    SELECT products.name, products.price, cart.quantity
+    SELECT products.id, products.name, products.price, cart.quantity
     FROM cart
     INNER JOIN products ON cart.product_id = products.id
     WHERE cart.user_id = $user_id
@@ -34,6 +36,22 @@ while($item = $cart_query->fetch_assoc()){
     $line_total = $item['price'] * $item['quantity'];
     $total_price += $line_total;
     $products_list .= $item['name'] . " x " . $item['quantity'] . " = $" . number_format($line_total,2) . "\n";
+
+
+    $order_query = $conn->query("
+        INSERT INTO orders (
+            user_id,
+            product_id,
+            quantity,
+            status
+        )
+        VALUES (
+            " . $user_id .",
+            " . $item['id'] . ",
+            " . $item['quantity'] . ",
+            'processing'
+        );
+    ");
 }
 
 // Free shipping logic
@@ -50,6 +68,12 @@ $message .= "Address: " . $user['address'] . "\n\n";
 $message .= "Products:\n" . $products_list . "\n";
 $message .= "Total: $" . number_format($total_price,2) . "\n";
 $message .= "Shipping: " . $shipping_status . "\n";
+
+
+// Add in db table orders
+
+
+
 
 // ✅ Use PHPMailer instead of mail()
 use PHPMailer\PHPMailer\PHPMailer;
@@ -104,3 +128,4 @@ $redirect_url .= (strpos($redirect_url, '?') === false ? '?' : '&') . 'message=P
 header("Location: $redirect_url");
 exit();
 ?>
+

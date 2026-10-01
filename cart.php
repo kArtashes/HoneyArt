@@ -34,7 +34,7 @@ if (!isset($_SESSION['user_id'])) {
                             </div>
                             <div id="basket_item_det">
                                 <div class="item-name"><?php echo htmlspecialchars($row['name']); ?></div>
-                                <div class="item-price">$<?php echo number_format($row['price'], 0); ?></div>
+                                <div class="item-price">֏<?php echo number_format($row['price'], 0); ?></div>
                                 <div class="item-qty">
                                     <button class="qty-btn decrease-btn">−</button>
                                     <span class="qty-value"><?php echo $row['quantity']; ?></span>

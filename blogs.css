@@ -89,6 +89,10 @@
       "wdth" 100;
   }
 
+.post h2{
+    margin-bottom: 0px;
+}
+
 .post .price {
     color: rgb(50, 50, 50);
     font-family: "TikTok Sans", sans-serif;

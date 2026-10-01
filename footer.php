@@ -11,16 +11,10 @@
         <div id="textinfo">
             <div class="footer-section2">
                 <h2>Quick links</h2>
-
-                <a href="">
-                    Products
-                </a>
-                <a href="">
-                    Magazine
-                </a>
-                <a href="">
-                    Contact us
-                </a>
+                <span><a href="products.php">Products</a></span>
+                <span><a href="blogs.php">Magazine</a></span>
+                <span><a href="support.php">Contact us</a></span>
+                <span><a href="aboutUs.php">About us</a></span>
             </div>
             <div class="footer-section3">
                 <h2>Contact</h2>

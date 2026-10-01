@@ -33,7 +33,7 @@ include('header.php');
         $content = $post['content'];
         
         // Replace literal "\r\n" sequences with <br>
-        $content = str_replace("\\r\\n", "<br>", $content);
+        $content = str_replace("\\r\\n", "", $content);
         
         // Optionally replace remaining \r or \n just in case
         $content = str_replace(["\\r","\\n"], "<br>", $content);
