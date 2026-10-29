@@ -7,3 +7,21 @@
     height: auto;
     display: block;
 }
+
+/* Layout tables from the editor (image next to text): stack them on phones */
+@media (max-width: 767px) {
+    #post table,
+    #post tbody,
+    #post tr,
+    #post td {
+        display: block;
+        width: 100% !important;   /* overrides the editor's inline widths */
+        height: auto !important;
+    }
+    #post colgroup {
+        display: none;
+    }
+    #post td img {
+        margin: 0 auto;
+    }
+}

@@ -75,10 +75,11 @@
     display: block; 
 }
 
-button { 
-    margin: 5px; 
-    padding: 10px; 
-    cursor: pointer
+/* Login/register page only (this file loads on every page) */
+#login-reg-body button {
+    margin: 5px;
+    padding: 10px;
+    cursor: pointer;
 }
 #login-slider-div {
     box-sizing: border-box;

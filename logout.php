@@ -3,15 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$host = 'localhost';
-$username = 'root';
-$password = 'root';
-$db_name = 'honey_art_db';
-$conn = new mysqli($host, $username, $password, $db_name);
-
-if ($conn->connect_error) {
-    die('error: ' . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 // If user is logged in, remove token from DB
 if (isset($_SESSION['user_id'])) {

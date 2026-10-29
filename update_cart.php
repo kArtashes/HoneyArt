@@ -5,11 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 header('Content-Type: application/json');
 
 // Database connection
-$conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-if ($conn->connect_error) {
-    echo json_encode(['quantity'=>0, 'cart_count'=>0, 'total_price'=>0, 'error'=>'DB connection failed']);
-    exit;
-}
+require_once __DIR__ . '/db.php';
 
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) {

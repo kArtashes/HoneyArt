@@ -37,12 +37,16 @@
 }
 
 
-#support-msg-btn {
-    width: 80%;
+#support-msg-button {
+    background: #d69c1c;
     color: #fff;
-    background-color: #212121;
-    height: 40px;
-    border-radius: 2%;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+#support-msg-button:hover {
+    opacity: .9;
 }
 
 @media(max-width: 600px){
@@ -55,4 +59,25 @@
         border: none;
         border-bottom: 1px solid #21212159;
     }
+}
+
+/* Result of sending the form */
+.support-message {
+    width: 69.8665%;
+    box-sizing: border-box;
+    margin: 0 0 8px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 15px;
+}
+.support-message.success { background: #e6f4ea; color: #217a3c; }
+.support-message.error   { background: #fde7e7; color: #b42318; }
+
+/* Hidden trap field for spam bots (kept out of sight, not display:none) */
+.support-hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
 }

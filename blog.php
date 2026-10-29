@@ -1,13 +1,10 @@
 <?php
 // Database connection
-$conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 // Validate ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    echo "No product selected.";
+    echo "No post selected.";
     exit;
 }
 
@@ -25,28 +22,14 @@ if (!$post) {
 }
 
 
+$pageTitle = $post['title'];
 include('header.php');
 ?>    
 
 <div id="post">
     <?php
-        $content = $post['content'];
-        
-        // Replace literal "\r\n" sequences with <br>
-        $content = str_replace("\\r\\n", "", $content);
-        
-        // Optionally replace remaining \r or \n just in case
-        $content = str_replace(["\\r","\\n"], "<br>", $content);
-        
-        // Remove slashes if any (from magic quotes or insert method)
-        $content = stripslashes($content);
-        
-        // Decode HTML entities (if any)
-        $content = html_entity_decode($content);
-        
-        
-        // Output the content
-        echo $content;
+        // Content is HTML written by the admin in TinyMCE, stored as-is
+        echo $post['content'];
     ?>
 </div>
 

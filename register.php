@@ -3,33 +3,40 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$host = 'localhost';
-$username = 'root';
-$password = "root";
-$db_name = 'honey_art_db';
-$conn = new mysqli($host, $username, $password, $db_name);
+require_once __DIR__ . '/db.php';
 
-if ($conn -> connect_error) {
-    die('error: ' . $conn->connect_error);
+
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: logInReg.php');
+    exit();
 }
 
+$username = trim($_POST['username'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$plainPassword = $_POST['password'] ?? '';
 
+if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($plainPassword) < 8) {
+    header('Location: logInReg.php?error=Please+enter+a+name%2C+valid+email%2C+and+a+password+of+at+least+8+characters.');
+    exit();
+}
 
-if($_SERVER['REQUEST_METHOD'] = "POST"){
-    $username = $_POST['username'];
-    $email = $_POST['email'];
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $phone = $_POST['phone'];
+try {
+    $passwordHash = password_hash($plainPassword, PASSWORD_DEFAULT);
+    $stmt = $conn->prepare('INSERT INTO users (username, email, password) VALUES (?, ?, ?)');
+    $stmt->bind_param('sss', $username, $email, $passwordHash);
+    $stmt->execute();
+    $newUserId = $conn->insert_id;
+    $stmt->close();
 
+    session_regenerate_id(true);
     $_SESSION['loggedIn'] = true;
+    $_SESSION['user_id'] = $newUserId;
     $_SESSION['email'] = $email;
-    header("Location: logInReg.php");
-    
+    header('Location: account.php');
+    exit();
+} catch (mysqli_sql_exception $e) {
+    header('Location: logInReg.php?error=This+email+is+already+registered.');
+    exit();
 }
-
-$sql = "INSERT INTO users (`username`, `email`, `password`, `phone`) 
-VALUES ('$username', '$email', '$password', '$phone')";
-$result = $conn->query($sql);
-
-exit();
 ?>

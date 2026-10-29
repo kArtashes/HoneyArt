@@ -1,42 +1,35 @@
+/* =========================================================
+   PRODUCT PAGE — mobile-first
+   phones: photo, thumbnails, then details under each other
+   768px+: photos left (40%), details right (60%) — original layout
+   ========================================================= */
 #product {
-    display: flex;
-    margin-left: 3%;
-    margin-right: 3%;
+    margin: 16px;
 }
 
-
-
-#product-photos {
-    width: 40%;
-    height: 80vh;
-    margin-right: 15px;
-}
-
-#product-details {
-    width: 60%;
-}
-
+/* Square photo box: no empty bands above/below the jar */
 #slider {
     position: relative;
-    display: block;
     width: 100%;
-    height: 80%;
-    align-items: center;   /* Vertical center */
-    justify-content: center; /* Horizontal center */
-    gap: 10px; /* Space between buttons and image */
+    aspect-ratio: 1 / 1;
     overflow: hidden;
-    object-fit: cover;
+    border-radius: 16px;
+    background: #fff;
+    touch-action: pan-y; /* vertical scroll works, horizontal swipe changes the photo */
 }
 
 #slider img {
-    margin-top: 10px;
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
+    user-select: none;
+    -webkit-user-drag: none;
 }
 
+/* Phones swipe; the arrows appear from 768px */
 .nav-btn {
+    display: none;
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -51,6 +44,7 @@
 }
 .nav-btn.left { left: 10px; }
 .nav-btn.right { right: 10px; }
+
 .thumbnails {
     display: flex;
     justify-content: center;
@@ -59,26 +53,28 @@
     flex-wrap: wrap;
 }
 .thumbnails img {
-    width: 70px;
-    height: 70px;
+    width: 56px;
+    height: 56px;
     object-fit: cover;
     cursor: pointer;
     border: 2px solid transparent;
-    border-radius: 5px;
+    border-radius: 8px;
     transition: border-color 0.3s;
 }
 .thumbnails img.active {
     border-color: #d38f12;
 }
+
 #product-details p {
-    margin-top: 10px;
-    margin-bottom: 0;
+    margin: 20px 0 0;
     font-family: 'Cormorant Garamond', serif;
-    font-weight: 700;   /* Bold */
-    font-size: 60px;    /* Adjust size as needed */
-    line-height: 1.1;   /* Tight spacing like in image */
-    color: #222;      
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1.1;
+    color: #222;
 }
+
+/* Shared with other pages — keep these two global */
 .price {
     font-size: 24px;
     color: #222;
@@ -89,63 +85,101 @@
     font-size: 18px;
     text-align: center;
 }
-#price-add{
+
+/* Phones: price, then a full-width button that's easy to tap */
+#price-add {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 12px;
+}
+#product-details .price {
+    font-weight: 700;
 }
 
-#product-add{
-    padding: 5px 10px;
+#product-add {
+    width: 100%;
+    margin: 0;             /* logInReg.css gives every button a 5px margin */
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
     color: #fff;
     background-color: #212121;
-    border-radius: 2%;
+    cursor: pointer;
 }
- 
-/* Responsive Design */
-@media (max-width: 600px) {
-    .nav-btn {
-        display: none;
-    }
 
+#product-details .description {
+    margin: 20px 0;
+    font-size: 16px;
+    line-height: 1.6;
+    text-align: left;
+}
+
+/* ---------- Tablets & desktops: original side-by-side layout ---------- */
+@media (min-width: 768px) {
     #product {
-        display: block;
-    }
-    #product-photos{
-        width: 100%;
-        height: 50vh;
-    }
-    #product-details {
-        width: 100%;
+        display: flex;
+        margin: 0 3%;
     }
 
+    #product-photos {
+        width: 40%;
+        height: 80vh;
+        margin-right: 15px;
+    }
+
+    #product-details {
+        width: 60%;
+    }
+
+    #slider {
+        aspect-ratio: auto;
+        height: 80%;
+        border-radius: 0;
+        background: none;
+    }
 
     #slider img {
         margin-top: 10px;
-        width: 100%;
-        /* max-height: 365px; */
-        object-fit: contain;
+    }
+
+    .nav-btn {
         display: block;
     }
-    .thumbnails img {
-        width: 60px;
-        height: 60px;
-    }
-    
 
+    .thumbnails img {
+        width: 70px;
+        height: 70px;
+        border-radius: 5px;
+    }
 
     #product-details p {
         margin-top: 10px;
-        margin-bottom: 0;
-        font-family: 'Cormorant Garamond', serif;
-        font-weight: 800px;   /* Bold */
-        font-size: 40px;    /* Adjust size as needed */
-        line-height: 1.1;   /* Tight spacing like in image */
-        color: #222;      
+        font-size: 60px;
     }
 
-    .description {
-        margin: 15px 0;
+    #price-add {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    #product-details .price {
+        font-weight: normal;
+    }
+
+    #product-add {
+        width: auto;
+        padding: 5px 10px;
+        border-radius: 2%;
+        font-size: 13px;
+        font-weight: normal;
+    }
+
+    #product-details .description {
+        margin: 15px 0 0;
         font-size: 18px;
+        line-height: normal;
         text-align: center;
     }
 }

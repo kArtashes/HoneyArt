@@ -25,10 +25,7 @@ if (!$product_id) {
 }
 
 
-$conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 $stmt = $conn->prepare(
     "SELECT id FROM wishlist 

@@ -1,20 +1,28 @@
 #search-row {
     position: fixed;       /* fixed to top of screen */
-    display: none;          /* hidden above */
+    display: flex;
+    top: 0;
     left: 0;
     width: 100%;
     background: #ffffff;
     padding: 10px;
     box-sizing: border-box;
-    /* display: flex; */
     justify-content: space-around;
     align-items: center;
-    transition: top 0.4s ease;  /* smooth slide */
+    transform: translateY(-100%);  /* hidden above */
+    visibility: hidden;
+    transition: transform 0.4s ease, visibility 0.4s;  /* smooth slide */
     z-index: 9999;
     height: 14.5%;
 }
 #search-row.show {
-    top: 0;  /* slides down over header */
+    transform: translateY(0);  /* slides down over header */
+    visibility: visible;
+}
+#search-row button {
+    margin: 5px;
+    padding: 10px;
+    cursor: pointer;
 }
 #search-form-icon{
     width: 30px;
@@ -55,7 +63,14 @@
     height: 100%;
     background: rgba(0, 0, 0, 0.5); /* dark transparent */
     z-index: 9998;
-    display: none; /* hidden by default */
+    display: block;
+    opacity: 0;            /* hidden by default */
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+#search-overlay.show {
+    opacity: 1;
+    visibility: visible;
 }
 
 .search-product {

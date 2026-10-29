@@ -1,9 +1,10 @@
 <?php
-include('db.php');
+require_once __DIR__ . '/db.php';
 
 $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
 
 
+$pageTitle = 'Blog';
 include('header.php'); 
 ?>
 
@@ -21,7 +22,7 @@ include('header.php');
                     <?php if (!empty($row["image_data"])): ?>
                         <img src="post_image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['title']); ?>">
                     <?php else: ?>
-                        <img src="default.png" alt="No Image">
+                        <img src="images/default.webp" alt="No Image">
                     <?php endif; ?>
                     <h2><?php echo htmlspecialchars($row['title']); ?></h2>
                     <p><?php echo htmlspecialchars($row['description'])?></p>

@@ -6,6 +6,7 @@
   html, body {
     margin: 0;
     padding: 0;
+    background: #f5efe7;
     font-family: "TikTok Sans", sans-serif;
     font-optical-sizing: auto;
     font-weight: 400;
@@ -15,29 +16,90 @@
         "wdth" 100;
   }
   
+  /* =========================================================
+     HEADER — mobile-first
+     base: phones (hamburger + search | logo | basket + account)
+     768px+: tablets & desktops (links | logo | icons)
+     ========================================================= */
   header {
     width: 100%;
     background-color: #212121;
   }
-  
+
   #header {
     width: 100%;
   }
-  
+
+  /* 3 columns: side columns share the free space, logo always stays centered */
   #header_menu {
     width: 100%;
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    padding: 10px 20px;
+    gap: 8px;
+    padding: 8px 12px;
   }
-  
-  #section-1 {
+
+  #header_menu > a {
+    justify-self: center;
+    text-decoration: none;
+  }
+
+  /* "header" prefix beats the global .logo rule in accountstyle.css */
+  header .logo {
+    font-size: clamp(24px, 7vw, 34px);
+    line-height: 1;
+    white-space: nowrap;
+    color: #d38f12;
+  }
+
+  .logo .honey {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+  }
+
+  .logo .art {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+  }
+
+  /* ---------- Left: hamburger + search (phones) ---------- */
+  #section-0 {
     display: flex;
+    justify-self: start;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #hamburger,
+  #mobile-search {
+    width: 40px;           /* touch target */
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  #hamburger img {
+    width: 28px;
+    height: auto;
+  }
+
+  #mobile-search img {
+    width: 24px;
+    height: auto;
+  }
+
+  /* ---------- Left: page links (tablets & desktops) ---------- */
+  #section-1 {
+    display: none;
+    justify-self: start;
     gap: 10px;
   }
-  
+
   #section-1 a {
+    position: relative;
     margin: 10px;
     text-decoration: none;
     font: inherit;
@@ -45,11 +107,6 @@
     color: #ECE6D4;
   }
 
-  #section-1 a {
-    position: relative;
-    text-decoration: none;
-  }
-  
   #section-1 a::after {
     content: "";
     position: absolute;
@@ -60,158 +117,84 @@
     background-color: #ECE6D4;
     transition: width 0.3s ease;
   }
-  
+
   #section-1 a:hover::after {
     width: 100%;
   }
-  
 
-  
-  .logo {
-    font-size: clamp(0.5rem, 3vw + 1rem, 3rem);
-    color: #d38f12;
-    flex-shrink: 0;
-  }
-  
-  .logo .honey {
-    font-family: 'Playfair Display', serif;
-    font-weight: 400;
-  }
-  
-  .logo .art {
-    font-family: 'Cinzel', serif;
-    font-weight: 700;
-  }
-  
+  /* ---------- Right: icons ---------- */
   #section-2 {
     display: flex;
-    gap: 10px;
+    justify-self: end;
     align-items: center;
+    gap: 4px;
   }
-  
+
   #section-2 button {
+    width: 40px;           /* touch target */
+    height: 40px;
+    margin: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
   }
-  
-#basket-icon {
-    width: 30px;
-    height: auto;
-}
-#account-icon {
-    width: 25px;
-    height: auto;
-}
-#search-icon {
-    width: 30px;
-    height: auto;
-}
-  
-  #hamburger {
-    width: 40px;
-    cursor: pointer;
+
+  #section-2 .desktop-search {
+    display: none;         /* phones use #mobile-search on the left */
   }
-  
-  #hamburger img {
-    width: 100%;
+  #search-icon {
+    width: 26px;
     height: auto;
   }
-  
-  #mobile-search {
-    width: 40px;
-    display: none;
-  }
-  
-  #mobile-search img {
-    width: 100%;
+  #basket-icon {
+    width: 26px;
     height: auto;
   }
-  
-  #section-0 {
-    display: none;
-    align-items: center;
-    gap: 10px;
+  #account-icon {
+    width: 22px;
+    height: auto;
   }
-  
-  @media (max-width: 768px) {
-    #section-0 {
-      display: flex;
-    }
-  
-    #search-icon {
-      display: none;
-    }
-  
-    #section-1 {
-      display: none;
-      flex-direction: column;
-      background-color: #ffffff;
-      width: 100%;
-    }
-  
-    #header_menu.show {
-      display: grid;
-      grid-template-columns: 1fr;
-      justify-items: end;
-      gap: 10px;
-      height: auto;
-    }
-  
-    #cross_page {
-      display: flex;
-      align-items: center;
-    }
-  
-    #pages {
-      display: grid;
-    }
-  
-    body.menu-open #hamburger {
-      display: none;
-    }
-  
-    body.menu-open #cross {
-      display: block;
-    }
-  
-    #header_menu a {
-      padding: 5px;
+
+  /* ---------- Tablets & desktops ---------- */
+  @media (min-width: 768px) {
+    #header_menu {
+      padding: 10px 20px;
     }
 
-    #header_menu form {
-      margin: 20px 0;
+    header .logo {
+      font-size: clamp(34px, 4vw, 48px);
     }
-  
-    #header_menu div {
-      padding: 0px 5px;
+
+    #section-0 {
+      display: none;
     }
-  
-    #mobile-search {
-      display: block;
+
+    #section-1 {
+      display: flex;
     }
-  }
-  @media(max-width: 420px){
+
+    #section-2 {
+      gap: 10px;
+    }
+
+    #section-2 .desktop-search {
+      display: flex;
+    }
+    #search-icon {
+      width: 30px;
+    }
     #basket-icon {
-        width: 30px;
-        height: auto;
+      width: 30px;
     }
     #account-icon {
-        width: 23px;
-        height: auto;
+      width: 25px;
     }
-    #hamburger {
-        width: 35px;
-        cursor: pointer;
-      }
-      
-      
-      #mobile-search {
-        width: 27px;
-      }
-}
-  
+  }
+
 
 
 
@@ -306,6 +289,7 @@
   top: 0;
   right: -100%;
   width: 400px;
+  max-width: 100%;
   height: 100%;
   background: #fff;
   z-index: 100;
@@ -331,6 +315,16 @@
   padding: 0px;
   margin: 0px;
   transition: all 0.5s ease;
+}
+#basket-heading button {
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  background: #d69c1c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 #basket-heading button:hover{
   transform: scale(1.2);
@@ -401,13 +395,7 @@ progress::-moz-progress-bar {
   color: #fff;
   background-color: #212121;
   height: 40px;
+  border: none;
   border-radius: 2%;
-}
-
-
-
-@media (max-width: 400px){
-  .basket-panel {
-    width: 100%;
-  }
+  cursor: pointer;
 }

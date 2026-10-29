@@ -2,10 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-$conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo '<p>Your basket is empty. Please log in to see your items.</p>';
@@ -29,7 +26,7 @@ if (!isset($_SESSION['user_id'])) {
                                 <?php if (!empty($row["image_data"])): ?>
                                     <img src="image.php?id=<?php echo $row['product_id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
                                 <?php else: ?>
-                                    <img src="./images/default.png" alt="No Image" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
+                                    <img src="./images/default.webp" alt="No Image" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
                                 <?php endif; ?>
                             </div>
                             <div id="basket_item_det">

@@ -1,9 +1,5 @@
 <?php
-$conn = new mysqli("localhost", "root", "root", "honey_art_db");
-$id = intval($_GET['id']);
-$res = $conn->query("SELECT image_data, image_type FROM product_images WHERE id=$id");
-if ($row = $res->fetch_assoc()) {
-    header("Content-Type: " . $row["image_type"]);
-    echo $row["image_data"];
-}
-?>
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/image_utils.php';
+
+serveStoredImage($conn, 'product_images', (int) ($_GET['id'] ?? 0));

@@ -1,10 +1,4 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-?>
-
-
-<?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -12,29 +6,31 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: adminlogin.php");
     exit;
 }
+require __DIR__ . '/admin_auth.php';
+require_once __DIR__ . '/image_utils.php';
 
 // Connect to DB
-$conn = new mysqli("localhost", "root", "root", "honey_art_db");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 // Handle save (insert/update)
 if (isset($_POST['save'])) {
-    $id = $_POST['id'];
-    $name = $conn->real_escape_string($_POST['name']);
-    $description = $conn->real_escape_string($_POST['description']);
-    $price = $_POST['price'];
-    $stock_quantity = $_POST['stock_quantity'];
-    $category = $conn->real_escape_string($_POST['category']);
-    $weight_kg = $_POST['weight_kg'];
+    requireAdminCsrf($_POST['csrf_token'] ?? null);
+    // Prepared statements handle escaping; escaping here too stored "\" in descriptions
+    $id = (int) ($_POST['id'] ?? 0);
+    $name = trim((string) ($_POST['name'] ?? ''));
+    $description = trim((string) ($_POST['description'] ?? ''));
+    $price = (float) ($_POST['price'] ?? 0);
+    $stock_quantity = (int) ($_POST['stock_quantity'] ?? 0);
+    $category = trim((string) ($_POST['category'] ?? ''));
+    $weight_kg = (float) ($_POST['weight_kg'] ?? 0);
 
     $image_data = null;
     $image_type = null;
 
     if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
-        $image_data = file_get_contents($_FILES['image_file']['tmp_name']);
-        $image_type = $_FILES['image_file']['type'];
+        // Stored as a resized WebP; a file that isn't an image is ignored
+        $image_data = toWebp(file_get_contents($_FILES['image_file']['tmp_name']), PRODUCT_IMAGE_MAX_WIDTH);
+        $image_type = $image_data === null ? null : 'image/webp';
     }
 
     if ($id) {
@@ -93,7 +89,9 @@ if (isset($_POST['save'])) {
             $image_data,
             $image_type
         );
-        $stmt->send_long_data(6, $image_data);
+        if ($image_data !== null) {
+            $stmt->send_long_data(6, $image_data);
+        }
         $stmt->execute();
         $id = $conn->insert_id; // New product ID
     }
@@ -103,8 +101,11 @@ if (isset($_POST['save'])) {
         $count = count($_FILES['additional_images']['name']);
         for ($i = 0; $i < $count; $i++) {
             if ($_FILES['additional_images']['error'][$i] === 0) {
-                $imgData = file_get_contents($_FILES['additional_images']['tmp_name'][$i]);
-                $imgType = $_FILES['additional_images']['type'][$i];
+                $imgData = toWebp(file_get_contents($_FILES['additional_images']['tmp_name'][$i]), PRODUCT_IMAGE_MAX_WIDTH);
+                $imgType = 'image/webp';
+                if ($imgData === null) {
+                    continue; // not an image
+                }
 
                 $stmt = $conn->prepare("
                     INSERT INTO product_images (product_id, image_data, image_type)
@@ -123,7 +124,8 @@ if (isset($_POST['save'])) {
 
 // Handle delete product
 if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
+    requireAdminCsrf($_GET['token'] ?? null);
+    $id = (int) $_GET['delete'];
     $conn->query("DELETE FROM products WHERE id=$id");
     header("Location: admin_add_product.php");
     exit;
@@ -132,7 +134,7 @@ if (isset($_GET['delete'])) {
 // Handle edit
 $product = null;
 if (isset($_GET['edit'])) {
-    $id = $_GET['edit'];
+    $id = (int) $_GET['edit'];
     $res = $conn->query("SELECT * FROM products WHERE id=$id");
     $product = $res->fetch_assoc();
 }
@@ -198,16 +200,49 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
             color: #d38f12;
             text-decoration: none;
         }
+
+        /* Inputs include their padding, so they don't stick out of the form */
+        form input, form textarea {
+            box-sizing: border-box;
+        }
+
+        /* ---------- Phones & small tablets ---------- */
+        @media (max-width: 767px) {
+            body {
+                margin: 12px;
+            }
+            h1 {
+                font-size: 26px;
+            }
+            form {
+                padding: 14px;
+            }
+            /* The list scrolls sideways inside its box instead of widening the page */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            table th, table td {
+                padding: 8px;
+                min-width: 90px;
+            }
+            img.thumbnail {
+                max-width: 64px;
+                max-height: 64px;
+            }
+        }
     </style>
 </head>
 <body>
 
 <h1>Admin Panel - HoneyArt</h1>
-<p><a href="logout.php">Logout</a> | <a href="admin_add_blog.php">Add blog</a> | <a href="admin_orders.php">Orders</a></p>
+<p><a href="adminlogout.php">Logout</a> | <a href="admin_add_blog.php">Add blog</a> | <a href="admin_orders.php">Orders</a></p>
 
 <h2><?php echo $product ? "Edit Product" : "Add New Product"; ?></h2>
 
 <form action="admin_add_product.php" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(adminCsrfToken()); ?>">
     <input type="hidden" name="id" value="<?php echo $product['id'] ?? ''; ?>">
     <input type="text" name="name" placeholder="Product Name" required value="<?php echo htmlspecialchars($product['name'] ?? ''); ?>">
     <textarea name="description" placeholder="Description"><?php echo htmlspecialchars($product['description'] ?? ''); ?></textarea>
@@ -230,14 +265,14 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
 
         <p>Other Images:</p>
         <?php
-        $pid = $product["id"];
+        $pid = (int) $product["id"];
         $imgs = $conn->query("SELECT id FROM product_images WHERE product_id = $pid");
         while ($img = $imgs->fetch_assoc()):
         ?>
             <div style="display:inline-block;">
                 <img src="extra_image.php?id=<?php echo $img["id"]; ?>" class="thumbnail" />
                 <br />
-                <a href="delete_image.php?id=<?php echo $img["id"]; ?>&pid=<?php echo $pid; ?>" onclick="return confirm('Delete this image?')">Delete</a>
+                <a href="delete_image.php?id=<?php echo (int) $img["id"]; ?>&pid=<?php echo $pid; ?>&token=<?php echo urlencode(adminCsrfToken()); ?>" onclick="return confirm('Delete this image?')">Delete</a>
             </div>
         <?php endwhile; ?>
     <?php endif; ?>
@@ -275,7 +310,7 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
                 <td><?php echo htmlspecialchars($row["category"]); ?></td>
                 <td>
                     <a href="admin_add_product.php?edit=<?php echo $row["id"]; ?>">Edit</a> |
-                    <a href="admin_add_product.php?delete=<?php echo $row["id"]; ?>" onclick="return confirm('Delete this product?')">Delete</a>
+                    <a href="admin_add_product.php?delete=<?php echo (int) $row["id"]; ?>&token=<?php echo urlencode(adminCsrfToken()); ?>" onclick="return confirm('Delete this product?')">Delete</a>
                 </td>
             </tr>
         <?php endwhile; ?>

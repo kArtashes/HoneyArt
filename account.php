@@ -2,15 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
-$host = 'localhost';
-$username = 'root';
-$password = "root";
-$db_name = 'honey_art_db';
-$conn = new mysqli($host, $username, $password, $db_name);
-
-if ($conn->connect_error) {
-  die('error: ' . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 // 🔹 Restore session from remember me cookie if not logged in
 if (!isset($_SESSION['loggedIn']) && isset($_COOKIE['remember_token'])) {
@@ -23,6 +15,7 @@ if (!isset($_SESSION['loggedIn']) && isset($_COOKIE['remember_token'])) {
   while ($row = $result->fetch_assoc()) {
     if (password_verify($token, $row['remember_token'])) {
       // restore session
+      session_regenerate_id(true);
       $_SESSION['loggedIn'] = true;
       $_SESSION['user_id'] = $row['id'];
       $_SESSION['email'] = $row['email'];
@@ -41,18 +34,19 @@ if (empty($_SESSION['csrf_token'])) {
   $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+$user_id = (int) ($_SESSION['user_id'] ?? 0);
+$activeSection = 'dashboard';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
   if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
     http_response_code(403);
     exit('Invalid request.');
   }
 
-  $user_id = (int) ($_SESSION['user_id'] ?? 0);
-
   try {
     $conn->begin_transaction();
 
-    foreach (['cart', 'wishlist', 'recently_viewed'] as $table) {
+    foreach (['cart', 'wishlist', 'recently_viewed', 'user_addresses'] as $table) {
       $stmt = $conn->prepare("DELETE FROM {$table} WHERE user_id = ?");
       $stmt->bind_param('i', $user_id);
       $stmt->execute();
@@ -83,13 +77,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
 
 // Process profile updates before any HTML is sent, so redirects can set headers.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
-  $user_id = $_SESSION['user_id'] ?? 0;
   $username = trim($_POST['username'] ?? '');
   $email = trim($_POST['email'] ?? '');
-  $phone = trim($_POST['phone'] ?? '');
-  $address = trim($_POST['address'] ?? '');
 
-  if ($username === '' || $email === '') {
+  if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
+    $_SESSION['flash_message'] = 'Invalid request. Please try again.';
+    $_SESSION['flash_type'] = 'error';
+  } elseif ($username === '' || $email === '') {
     $_SESSION['flash_message'] = 'Username և Email պարտադիր են։';
     $_SESSION['flash_type'] = 'error';
   } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -97,9 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
     $_SESSION['flash_type'] = 'error';
   } elseif ($user_id) {
     $updateStmt = $conn->prepare(
-      'UPDATE users SET username = ?, email = ?, phone = ?, address = ? WHERE id = ?'
+      'UPDATE users SET username = ?, email = ? WHERE id = ?'
     );
-    $updateStmt->bind_param('ssssi', $username, $email, $phone, $address, $user_id);
+    $updateStmt->bind_param('ssi', $username, $email, $user_id);
 
     try {
       $updateStmt->execute();
@@ -118,12 +112,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
   exit();
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_address'])) {
+  $addressId = filter_input(INPUT_POST, 'address_id', FILTER_VALIDATE_INT) ?: 0;
+  $phone = trim($_POST['phone'] ?? '');
+  $city = trim($_POST['city'] ?? '');
+  $region = trim($_POST['region'] ?? '');
+  $addressLine1 = trim($_POST['address_line1'] ?? '');
+  $addressLine2 = trim($_POST['address_line2'] ?? '');
+  $notes = trim($_POST['notes'] ?? '');
+
+  if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
+    $_SESSION['flash_message'] = 'Invalid request. Please try again.';
+    $_SESSION['flash_type'] = 'error';
+  } elseif ($phone === '' || $city === '' || $addressLine1 === '') {
+    $_SESSION['flash_message'] = 'Phone, city, and address line 1 are required.';
+    $_SESSION['flash_type'] = 'error';
+  } else {
+    try {
+      if ($addressId) {
+        $stmt = $conn->prepare(
+          'UPDATE user_addresses
+           SET phone = ?, city = ?, region = ?, address_line1 = ?, address_line2 = ?, notes = ?
+           WHERE id = ? AND user_id = ?'
+        );
+        $stmt->bind_param('ssssssii', $phone, $city, $region, $addressLine1, $addressLine2, $notes, $addressId, $user_id);
+      } else {
+        $stmt = $conn->prepare(
+          'INSERT INTO user_addresses (user_id, phone, city, region, address_line1, address_line2, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->bind_param('issssss', $user_id, $phone, $city, $region, $addressLine1, $addressLine2, $notes);
+      }
+      $stmt->execute();
+      $stmt->close();
+      $_SESSION['flash_message'] = $addressId ? 'Address updated successfully.' : 'Address added successfully.';
+      $_SESSION['flash_type'] = 'success';
+    } catch (mysqli_sql_exception $e) {
+      $_SESSION['flash_message'] = 'Could not save the address. Please try again.';
+      $_SESSION['flash_type'] = 'error';
+    }
+  }
+
+  header('Location: account.php');
+  exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_address'])) {
+  $addressId = filter_input(INPUT_POST, 'address_id', FILTER_VALIDATE_INT);
+
+  if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '') || !$addressId) {
+    $_SESSION['flash_message'] = 'Invalid request. Please try again.';
+    $_SESSION['flash_type'] = 'error';
+  } else {
+    $stmt = $conn->prepare('DELETE FROM user_addresses WHERE id = ? AND user_id = ?');
+    $stmt->bind_param('ii', $addressId, $user_id);
+    $stmt->execute();
+    $stmt->close();
+    $_SESSION['flash_message'] = 'Address deleted successfully.';
+    $_SESSION['flash_type'] = 'success';
+  }
+
+  header('Location: account.php');
+  exit();
+}
+
+$pageTitle = 'My Account';
+$pageStyles = ['accountstyle.css'];
 include('header.php');
 
 
-// fetch user info
-$stmt = $conn->prepare("SELECT id, username, email, phone, `address` FROM users WHERE email = ?");
-$stmt->bind_param("s", $_SESSION['email']);
+// Fetch the profile and all saved addresses for the current user.
+$stmt = $conn->prepare("SELECT id, username, email FROM users WHERE id = ?");
+$stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -131,16 +191,38 @@ $userinfo = [
   "id" => "",
   "username" => "",
   "email" => "",
-  "phone" => "",
-  "address" => "",
 ];
 
 if ($row = $result->fetch_assoc()) {
   $userinfo["id"] = $row['id'];
   $userinfo['username'] = $row['username'];
   $userinfo['email'] = $row['email'];
-  $userinfo['phone'] = $row['phone'];
-  $userinfo['address'] = $row['address'];
+}
+
+$addressStmt = $conn->prepare(
+  'SELECT id, phone, city, region, address_line1, address_line2, notes
+   FROM user_addresses WHERE user_id = ? ORDER BY updated_at DESC, id DESC'
+);
+$addressStmt->bind_param('i', $user_id);
+$addressStmt->execute();
+$addresses = $addressStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$addressStmt->close();
+$dashboardAddresses = array_slice($addresses, 0, 2);
+
+$editingAddress = null;
+$editingAddressId = filter_input(INPUT_GET, 'edit_address', FILTER_VALIDATE_INT);
+if ($editingAddressId) {
+  $editStmt = $conn->prepare(
+    'SELECT id, phone, city, region, address_line1, address_line2, notes
+     FROM user_addresses WHERE id = ? AND user_id = ?'
+  );
+  $editStmt->bind_param('ii', $editingAddressId, $user_id);
+  $editStmt->execute();
+  $editingAddress = $editStmt->get_result()->fetch_assoc();
+  $editStmt->close();
+  if ($editingAddress) {
+    $activeSection = 'addresses';
+  }
 }
 ?>
 <script>
@@ -148,6 +230,7 @@ if ($row = $result->fetch_assoc()) {
     '.dashboard',
     '.orders',
     '.wishlist',
+    '.addresses',
     '.paymantMethods',
     '.accountSettings',
   ];
@@ -158,10 +241,19 @@ if ($row = $result->fetch_assoc()) {
     });
 
     document.querySelector(section).style.display = 'block';
+
+    // Highlight the matching sidebar item
+    document.querySelectorAll('.sidebar li[data-section]').forEach(li => {
+      li.classList.toggle('active', li.dataset.section === section);
+    });
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    openSection('.<?php echo htmlspecialchars($activeSection); ?>');
+  });
 </script>
 
-<div class="container">
+<div class="container account-page">
   <aside class="sidebar">
     <div class="profile">
       <div class="avatar">👤</div>
@@ -169,18 +261,27 @@ if ($row = $result->fetch_assoc()) {
       <p><?php echo htmlspecialchars($userinfo['email']); ?></p>
     </div>
     <ul>
-      <li onclick="openSection('.dashboard')">Dashboard</li>
-      <li onclick="openSection('.orders')">Orders</li>
-      <li onclick="openSection('.wishlist')">Wishlist</li>
-      <li onclick="openSection('.paymantMethods')">Payment Methods</li>
-      <li onclick="openSection('.accountSettings')">Account Settings</li>
+      <li data-section=".dashboard" onclick="openSection('.dashboard')">Dashboard</li>
+      <li data-section=".orders" onclick="openSection('.orders')">Orders</li>
+      <li data-section=".wishlist" onclick="openSection('.wishlist')">Wishlist</li>
+      <li data-section=".addresses" onclick="openSection('.addresses')">Addresses</li>
+      <li data-section=".paymantMethods" onclick="openSection('.paymantMethods')">Payment Methods</li>
+      <li data-section=".accountSettings" onclick="openSection('.accountSettings')">Account Settings</li>
       <hr>
       <li class="logout" onclick="window.location.href='logout.php'">Log Out</li>
     </ul>
   </aside>
   <!-- ============================dashboard=================================== -->
   <div class="dashboard">
-    <h1>Welcome back, <?php echo $userinfo['username']; ?></h1>
+    <h1>Welcome back, <?php echo htmlspecialchars($userinfo['username']); ?></h1>
+    <?php if ($activeSection === 'dashboard' && isset($_SESSION['flash_message'])): ?>
+      <?php
+      $dashboardMessage = $_SESSION['flash_message'];
+      $dashboardMessageType = $_SESSION['flash_type'] ?? 'success';
+      unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+      ?>
+      <p class="account-flash <?php echo htmlspecialchars($dashboardMessageType); ?>"><?php echo htmlspecialchars($dashboardMessage); ?></p>
+    <?php endif; ?>
     <span>Here's what's happening with your HoneyART account.</span>
     <div id="dash-viewed">
       <div id="dash-viewed-heading">
@@ -207,14 +308,11 @@ if ($row = $result->fetch_assoc()) {
         ?>
         <?php if ($result->num_rows > 0): ?>
           <?php while ($row = $result->fetch_assoc()): ?>
-            <div class="viewedProduct" onclick="window.location.href='product.php?id=<?php echo $row['id'];
-            if ($_SESSION['viewed'][0] = !$row['id']) {
-              array_unshift($_SESSION['viewed'], $row['id']);
-            } ?>'">
+            <div class="viewedProduct" onclick="window.location.href='product.php?id=<?php echo (int) $row['id']; ?>'">
               <?php if (!empty($row["image_data"])): ?>
                 <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
               <?php else: ?>
-                <img src="default.png" alt="No Image">
+                <img src="images/default.webp" alt="No Image">
               <?php endif; ?>
               <?php
               $weight = $row['weight_kg'];
@@ -238,7 +336,7 @@ if ($row = $result->fetch_assoc()) {
     <div id="dash-orders">
       <div id="dash-orders-heading">
         <span>Recent Orders</span>
-        <button>View All Orders</button>
+        <button onclick="openSection('.orders')">View All Orders</button>
       </div>
       <div id="dash-orders-cont">
         <?php
@@ -250,7 +348,7 @@ if ($row = $result->fetch_assoc()) {
                     orders.status,
                     orders.created_at,
                     products.name,
-                    products.price,
+                    orders.unit_price AS price,
                     products.`image_data`, 
                     products.`image_type`
                 FROM orders
@@ -298,12 +396,12 @@ if ($row = $result->fetch_assoc()) {
               <img src="image.php?id=<?php echo $order['product_id']; ?>"
                 alt="<?php echo htmlspecialchars($order['name']); ?>">
             <?php else: ?>
-              <img src="default.png" alt="No Image">
+              <img src="images/default.webp" alt="No Image">
             <?php endif; ?>
             <div class="order-info">
               <div class="order-number">
                 #<?= htmlspecialchars($order['id']) ?>
-                - <?= htmlspecialchars($order['name']) ?>
+                - <?= htmlspecialchars($order['name']) ?><?= (int) $order['quantity'] > 1 ? ' × ' . (int) $order['quantity'] : '' ?>
               </div>
 
               <div class="order-date">
@@ -316,7 +414,7 @@ if ($row = $result->fetch_assoc()) {
             </div>
 
             <div class="order-price">
-              $<?= number_format($order['price'], 2) ?>
+              ֏<?= number_format($order['price'] * $order['quantity'], 0) ?>
             </div>
 
             <div class="order-arrow">
@@ -344,7 +442,6 @@ if ($row = $result->fetch_assoc()) {
           <div id="account-details-content">
             <div><span>Full name</span><span><?php echo htmlspecialchars($userinfo['username']); ?></span></div>
             <div><span>Email</span><span><?php echo htmlspecialchars($userinfo['email']); ?></span></div>
-            <div><span>Phone</span><span><?php echo htmlspecialchars($userinfo['phone']); ?></span></div>
           </div>
         <?php else: ?>
           <div class="empty-state">
@@ -359,25 +456,21 @@ if ($row = $result->fetch_assoc()) {
       <div id="section3-addresses" class="dash-card">
         <div style="display: flex; justify-content:space-between; width: 100%; margin: 0;">
           <span>Saved addresses</span>
-          <?php if (!empty($addresses)): ?>
-            <button onclick="openSection('.accountSettings')">Manage</button>
-          <?php endif; ?>
+          <button onclick="openSection('.addresses')">Manage</button>
         </div>
 
-        <?php if (!empty($addresses)): ?>
+        <?php if (!empty($dashboardAddresses)): ?>
           <div id="addresses-content">
-            <?php foreach ($addresses as $address): ?>
+            <?php foreach ($dashboardAddresses as $address): ?>
               <div class="address-item">
-                <img src="icons/pin.png" alt="" width="20" height="20">
+                <img src="./images/address.png" alt="" width="20" height="30">
                 <div>
-                  <span><?php echo htmlspecialchars($address['label']); ?></span>
-                  <?php if (!empty($address['isDefault'])): ?>
-                    <span class="badge">Default</span>
-                  <?php endif; ?>
                   <p>
-                    <?php echo htmlspecialchars($address['street']); ?>,
-                    <?php echo htmlspecialchars($address['city']); ?><br>
-                    <?php echo htmlspecialchars($address['country']); ?><br>
+                    <?php echo htmlspecialchars($address['address_line1']); ?><br>
+                    <?php if (!empty($address['address_line2'])): ?>
+                      <?php echo htmlspecialchars($address['address_line2']); ?><br>
+                    <?php endif; ?>
+                    <?php echo htmlspecialchars($address['city']); ?><?php echo !empty($address['region']) ? ', ' . htmlspecialchars($address['region']) : ''; ?><br>
                     <?php echo htmlspecialchars($address['phone']); ?>
                   </p>
                 </div>
@@ -389,7 +482,7 @@ if ($row = $result->fetch_assoc()) {
             <img src="images/image.png" alt="" width="48" height="48">
             <p>No saved addresses</p>
             <span>Add an address for a faster checkout experience.</span>
-            <button onclick="openSection('.accountSettings')">Add Address</button>
+            <button onclick="openSection('.addresses')">Add Address</button>
           </div>
         <?php endif; ?>
       </div>
@@ -475,7 +568,7 @@ if ($row = $result->fetch_assoc()) {
                     orders.status,
                     orders.created_at,
                     products.name,
-                    products.price,
+                    orders.unit_price AS price,
                     products.image_data,
                     products.image_type
                 FROM orders
@@ -533,12 +626,12 @@ if ($row = $result->fetch_assoc()) {
               <img src="image.php?id=<?php echo $order['product_id']; ?>"
                 alt="<?php echo htmlspecialchars($order['name']); ?>">
             <?php else: ?>
-              <img src="default.png" alt="No Image">
+              <img src="images/default.webp" alt="No Image">
             <?php endif; ?>
             <div class="order-info">
               <div class="order-number">
                 #<?= htmlspecialchars($order['id']) ?>
-                - <?= htmlspecialchars($order['name']) ?>
+                - <?= htmlspecialchars($order['name']) ?><?= (int) $order['quantity'] > 1 ? ' × ' . (int) $order['quantity'] : '' ?>
               </div>
 
               <div class="order-date">
@@ -551,7 +644,7 @@ if ($row = $result->fetch_assoc()) {
             </div>
 
             <div class="order-price">
-              $<?= number_format($order['price'], 2) ?>
+              ֏<?= number_format($order['price'] * $order['quantity'], 0) ?>
             </div>
 
             <div class="order-arrow">
@@ -587,12 +680,6 @@ if ($row = $result->fetch_assoc()) {
   <div class="wishlist">
     <h1>Wishlist</h1>
     <?php
-    $conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-
     $user_id = $_SESSION['user_id'] ?? 0;
 
     $stmt = $conn->prepare("
@@ -623,7 +710,7 @@ if ($row = $result->fetch_assoc()) {
                         if (!empty($row["image_data"])): ?>
                             <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                         <?php else: ?>
-                            <img src="default.png" alt="No Image">
+                            <img src="images/default.webp" alt="No Image">
                         <?php endif; ?>
                         <?php
                         $weight = $row['weight_kg'];
@@ -692,6 +779,88 @@ if ($row = $result->fetch_assoc()) {
     });
     </script>
   </div>
+  <!-- ============================addresses=================================== -->
+  <div class="addresses">
+    <h1>Addresses</h1>
+    <?php
+    $message = '';
+    $messageType = '';
+    if ($activeSection === 'addresses' && isset($_SESSION['flash_message'])) {
+      $message = $_SESSION['flash_message'];
+      $messageType = $_SESSION['flash_type'] ?? 'success';
+      unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+    }
+    ?>
+
+    <?php if ($message !== ''): ?>
+      <p class="account-flash <?php echo htmlspecialchars($messageType); ?>"><?php echo htmlspecialchars($message); ?></p>
+    <?php endif; ?>
+
+    <div class="address-manager">
+      <section class="card address-form-card">
+        <h2><?php echo $editingAddress ? 'Edit address' : 'Add a new address'; ?></h2>
+        <form method="POST" class="address-form">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+          <input type="hidden" name="address_id" value="<?php echo (int) ($editingAddress['id'] ?? 0); ?>">
+          <div class="address-form-grid">
+            <label>Phone *
+              <input name="phone" required value="<?php echo htmlspecialchars($editingAddress['phone'] ?? ''); ?>">
+            </label>
+            <label>City *
+              <input name="city" required value="<?php echo htmlspecialchars($editingAddress['city'] ?? ''); ?>">
+            </label>
+            <label>Region
+              <input name="region" value="<?php echo htmlspecialchars($editingAddress['region'] ?? ''); ?>">
+            </label>
+            <label>Address line 1 *
+              <input name="address_line1" required value="<?php echo htmlspecialchars($editingAddress['address_line1'] ?? ''); ?>">
+            </label>
+            <label>Address line 2
+              <input name="address_line2" value="<?php echo htmlspecialchars($editingAddress['address_line2'] ?? ''); ?>">
+            </label>
+            <label class="address-notes">Delivery notes
+              <textarea name="notes" rows="3" placeholder="Entrance, floor, delivery instructions..."><?php echo htmlspecialchars($editingAddress['notes'] ?? ''); ?></textarea>
+            </label>
+          </div>
+          <button type="submit" name="save_address"><?php echo $editingAddress ? 'Save address' : 'Add address'; ?></button>
+          <?php if ($editingAddress): ?>
+            <a class="cancel-edit" href="account.php">Cancel</a>
+          <?php endif; ?>
+        </form>
+      </section>
+
+      <section class="card saved-addresses-card">
+        <h2>Saved addresses</h2>
+        <?php if ($addresses): ?>
+          <?php foreach ($addresses as $address): ?>
+            <article class="saved-address-card">
+              <div>
+                <strong><?php echo htmlspecialchars($address['address_line1']); ?></strong>
+                <?php if (!empty($address['address_line2'])): ?>
+                  <span><?php echo htmlspecialchars($address['address_line2']); ?></span>
+                <?php endif; ?>
+                <span><?php echo htmlspecialchars($address['city']); ?><?php echo !empty($address['region']) ? ', ' . htmlspecialchars($address['region']) : ''; ?></span>
+                <span><?php echo htmlspecialchars($address['phone']); ?></span>
+                <?php if (!empty($address['notes'])): ?>
+                  <small><?php echo htmlspecialchars($address['notes']); ?></small>
+                <?php endif; ?>
+              </div>
+              <div class="address-actions">
+                <a href="account.php?edit_address=<?php echo (int) $address['id']; ?>">Edit</a>
+                <form method="POST" onsubmit="return confirm('Delete this address?');">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                  <input type="hidden" name="address_id" value="<?php echo (int) $address['id']; ?>">
+                  <button type="submit" name="delete_address" class="address-delete">Delete</button>
+                </form>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p class="empty-addresses">You have not saved any addresses yet.</p>
+        <?php endif; ?>
+      </section>
+    </div>
+  </div>
   <!-- ============================paymantMethods=================================== -->
   <div class="paymantMethods">
     <h1>Payment Methods</h1>
@@ -710,7 +879,7 @@ if ($row = $result->fetch_assoc()) {
     }
 
     // 1) Profile-ի տվյալները users աղյուսակից
-    $stmt = $conn->prepare("SELECT username, email, phone, `address` FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc(); // ասոցիատիվ array՝ մեկ տող
@@ -718,7 +887,7 @@ if ($row = $result->fetch_assoc()) {
 
     // Account Summary-ի համար
     $stmt2 = $conn->prepare("
-        SELECT COUNT(*) AS total_orders, SUM(products.price) AS total_spent FROM orders INNER JOIN products ON orders.product_id=products.id WHERE user_id = ?
+        SELECT COUNT(*) AS total_orders, SUM(CASE WHEN status <> 'cancelled' THEN unit_price * quantity ELSE 0 END) AS total_spent FROM orders WHERE user_id = ?
     ");
     $stmt2->bind_param("i", $user_id);
     $stmt2->execute();
@@ -733,17 +902,12 @@ if ($row = $result->fetch_assoc()) {
       <section class="card">
         <h2>Profile Information</h2>
         <form method="POST" action="">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
           <label>Full Name
             <input name="username" value="<?php echo htmlspecialchars($user['username'] ?? ''); ?>">
           </label>
           <label>Email
             <input name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>">
-          </label>
-          <label>Phone
-            <input name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
-          </label>
-          <label>Address
-            <input name="address" type="text" value="<?php echo htmlspecialchars($user['address'] ?? ''); ?>">
           </label>
           <button type="submit" name="save_profile">Save Changes</button>
         </form>
@@ -755,7 +919,7 @@ if ($row = $result->fetch_assoc()) {
         <h3>Account Summary</h3>
         <p>Member Since: <?php echo htmlspecialchars($user['member_since'] ?? '2026'); ?></p>
         <p>Total Orders: <?php echo (int)($summary['total_orders'] ?? 0); ?></p>
-        <p>Total Spent: $<?php echo number_format($summary['total_spent'] ?? 0, 2); ?></p>
+        <p>Total Spent: ֏<?php echo number_format($summary['total_spent'] ?? 0, 0); ?></p>
       </section>
     </div>
     <section class="card danger">
@@ -768,3 +932,5 @@ if ($row = $result->fetch_assoc()) {
     </section>
   </div>
 </div>
+
+<?php include('footer.php'); ?>

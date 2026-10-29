@@ -1,7 +1,4 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,27 +6,31 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: adminlogin.php");
     exit;
 }
+require __DIR__ . '/admin_auth.php';
+require_once __DIR__ . '/image_utils.php';
 
 
-$conn = new mysqli("localhost", "root", "root", "honey_art_db");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
-$id = isset($_POST['id']) ? $_POST['id'] : null;
+$id = isset($_POST['id']) ? (int) $_POST['id'] : null;
+$error = '';
 
 if (isset($_POST['save'])) {
+    requireAdminCsrf($_POST['csrf_token'] ?? null);
 
-    $title = $conn->real_escape_string($_POST['title']);
-    $description = $conn->real_escape_string($_POST['description']);
-    $content = $conn->real_escape_string($_POST['content']);
+    // Prepared statements handle escaping; escaping here too stored "\" in the posts
+    $title = trim((string) ($_POST['title'] ?? ''));
+    $description = trim((string) ($_POST['description'] ?? ''));
+    // Pictures pasted into the editor are converted too
+    $content = convertInlineImagesToWebp((string) ($_POST['content'] ?? ''), BLOG_IMAGE_MAX_WIDTH);
 
     $image_data = null;
     $image_type = null;
 
     if (!empty($_FILES['image_file']['tmp_name'])) {
-        $image_data = file_get_contents($_FILES['image_file']['tmp_name']);
-        $image_type = $_FILES['image_file']['type'];
+        // Stored as a resized WebP; a file that isn't an image is ignored
+        $image_data = toWebp(file_get_contents($_FILES['image_file']['tmp_name']), BLOG_IMAGE_MAX_WIDTH);
+        $image_type = $image_data === null ? null : 'image/webp';
     }
 
     if ($id) {
@@ -43,7 +44,9 @@ if (isset($_POST['save'])) {
                 WHERE id=?
             ");
 
-            $stmt->bind_param("bssssi", $title, $image_data, $image_type, $description, $content, $id);
+            $null = NULL;
+            $stmt->bind_param("sbsssi", $title, $null, $image_type, $description, $content, $id);
+            $stmt->send_long_data(1, $image_data);
 
         } else {
 
@@ -57,6 +60,10 @@ if (isset($_POST['save'])) {
         }
 
         $stmt->execute();
+
+    } elseif ($image_data === null) {
+
+        $error = 'Please choose a main image for the new post.';
 
     } else {
 
@@ -74,12 +81,18 @@ if (isset($_POST['save'])) {
         $stmt->execute();
         $id = $conn->insert_id;
     }
+
+    if ($error === '') {
+        header("Location: admin_add_blog.php?edit=$id&saved=1");
+        exit;
+    }
 }
 
 
 // Handle delete product
 if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
+    requireAdminCsrf($_GET['token'] ?? null);
+    $id = (int) $_GET['delete'];
     $conn->query("DELETE FROM blog_posts WHERE id=$id");
     header("Location: admin_add_blog.php");
     exit;
@@ -88,7 +101,7 @@ if (isset($_GET['delete'])) {
 // Handle edit
 $product = null;
 if (isset($_GET['edit'])) {
-    $id = $_GET['edit'];
+    $id = (int) $_GET['edit'];
     $res = $conn->query("SELECT * FROM blog_posts WHERE id=$id");
     $post = $res->fetch_assoc();
 }
@@ -161,10 +174,50 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
             color: #d38f12;
             text-decoration: none;
         }
-    </style>    <script src="https://cdn.tiny.cloud/1/4o28q5yinxxj89omjagikuje2yqwox9z2cbv1gssc04eaa82/tinymce/8/tinymce.min.js" referrerpolicy="origin" crossorigin="anonymous"></script>
+        .message {
+            padding: 12px 14px;
+            border-radius: 5px;
+        }
+        .message.success { background: #e6f4ea; color: #217a3c; }
+        .message.error { background: #fde7e7; color: #b42318; }
+
+        /* Inputs include their padding, so they don't stick out of the form */
+        form input, form textarea {
+            box-sizing: border-box;
+        }
+
+        /* ---------- Phones & small tablets ---------- */
+        @media (max-width: 767px) {
+            body {
+                margin: 12px;
+            }
+            h1 {
+                font-size: 26px;
+            }
+            form {
+                padding: 14px;
+            }
+            /* The list scrolls sideways inside its box instead of widening the page */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            table th, table td {
+                padding: 8px;
+                min-width: 90px;
+            }
+            img.thumbnail {
+                max-width: 64px;
+                max-height: 64px;
+            }
+        }
+    </style>    <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js"></script>
     <script>
       tinymce.init({
         selector: '#mytextarea',
+        license_key: 'gpl',
+        promotion: false,
         plugins: 'table lists link image code',
         toolbar: 'undo redo | bold italic | table tablecellprops tableprops | alignleft aligncenter alignright | code | image',
         menubar: 'file edit insert view format table tools help',
@@ -177,14 +230,20 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
 </head>
 <body> 
     <h1>Admin Panel - HoneyArt</h1>
-    <p><a href="logout.php">Logout</a> | <a href="admin_add_product.php">Add product</a> | <a href="admin_orders.php">Orders</a></p>
+    <p><a href="adminlogout.php">Logout</a> | <a href="admin_add_product.php">Add product</a> | <a href="admin_orders.php">Orders</a></p>
 
 
+    <?php if ($error !== ''): ?>
+        <p class="message error"><?php echo htmlspecialchars($error); ?></p>
+    <?php elseif (isset($_GET['saved'])): ?>
+        <p class="message success">Post saved.</p>
+    <?php endif; ?>
     <form method="post" enctype="multipart/form-data">
-    <input type="hidden" name="id" value="<?php echo $post['id'] ?? ''; ?>">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(adminCsrfToken()); ?>">
+    <input type="hidden" name="id" value="<?php echo (int) ($post['id'] ?? 0) ?: ''; ?>">
 
     <p>Title:</p>
-    <input name="title" type="text" value="<?php echo $post['title'] ?? ''; ?>">
+    <input name="title" type="text" required value="<?php echo htmlspecialchars($post['title'] ?? $_POST['title'] ?? ''); ?>">
 
     <p>Main Image:</p>
     <?php if (!empty($post['image_data'])): ?>
@@ -194,10 +253,10 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
     <input type="file" name="image_file" accept="image/*" />
 
     <p>Description:</p>
-    <input type="text" name="description" value="<?php echo $post['description'] ?? ''; ?>">
+    <input type="text" name="description" value="<?php echo htmlspecialchars($post['description'] ?? $_POST['description'] ?? ''); ?>">
 
     <p>Content:</p>
-    <textarea id="mytextarea" name="content"><?php echo $post['content'] ?? ''; ?></textarea>
+    <textarea id="mytextarea" name="content"><?php echo htmlspecialchars($post['content'] ?? $_POST['content'] ?? ''); ?></textarea>
 
     <button type="submit" name="save">
         <?php echo isset($post) ? "Update" : "Create"; ?>
@@ -227,7 +286,7 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
                     <td><?php echo htmlspecialchars($row["description"]); ?></td>
                     <td>
                         <a href="admin_add_blog.php?edit=<?php echo $row["id"]; ?>">Edit</a> |
-                        <a href="admin_add_blog.php?delete=<?php echo $row["id"]; ?>" onclick="return confirm('Delete this post?')">Delete</a>
+                        <a href="admin_add_blog.php?delete=<?php echo (int) $row["id"]; ?>&token=<?php echo urlencode(adminCsrfToken()); ?>" onclick="return confirm('Delete this post?')">Delete</a>
                     </td>
                 </tr>
             <?php endwhile; ?>

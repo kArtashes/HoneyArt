@@ -1,14 +1,18 @@
 <?php
-include('db.php');
+require_once __DIR__ . '/db.php';
 if(isset($_POST['inputText'])){
-    $input = $_POST['inputText'];
+    // Escape LIKE wildcards so "%" or "_" are searched literally
+    $like = '%' . addcslashes((string) $_POST['inputText'], '%_\\') . '%';
 
-    $query = "SELECT * FROM products WHERE `name` LIKE '%{$input}%' LIMIT 3";
-    $squery = "SELECT * FROM products WHERE `name` LIKE '%{$input}%' LIMIT 7";
+    $stmt = $conn->prepare("SELECT * FROM products WHERE `name` LIKE ? LIMIT 3");
+    $stmt->bind_param("s", $like);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    $result = mysqli_query($conn, $query);
-
-    $sresult = mysqli_query($conn, $squery);
+    $sstmt = $conn->prepare("SELECT * FROM products WHERE `name` LIKE ? LIMIT 7");
+    $sstmt->bind_param("s", $like);
+    $sstmt->execute();
+    $sresult = $sstmt->get_result();
 
     if(mysqli_num_rows($result) > 0){ ?>
         <style>
@@ -31,7 +35,7 @@ if(isset($_POST['inputText'])){
                         <?php if (!empty($row["image_data"])): ?>
                             <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                         <?php else: ?>
-                            <img src="default.png" alt="No Image">
+                            <img src="images/default.webp" alt="No Image">
                         <?php endif; ?>
                         <h2><?php echo htmlspecialchars($row['name']); ?></h2>
                     </div>

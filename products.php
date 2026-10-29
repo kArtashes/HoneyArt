@@ -3,11 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 $user_id = $_SESSION['user_id'] ?? 0;
 
@@ -27,6 +23,7 @@ $stmt->execute();
 
 $result = $stmt->get_result();
 
+$pageTitle = 'All Products';
 include('header.php'); ?>
 
 <div id="product_general_image">
@@ -53,7 +50,7 @@ include('header.php'); ?>
                     if (!empty($row["image_data"])): ?>
                         <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                     <?php else: ?>
-                        <img src="default.png" alt="No Image">
+                        <img src="images/default.webp" alt="No Image">
                     <?php endif; ?>
                     <?php
                     $weight = $row['weight_kg'];

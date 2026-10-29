@@ -1,28 +1,25 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require __DIR__ . '/admin_auth.php';
 
 // Check if already logged in
-if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
+if (($_SESSION["loggedin"] ?? false) === true) {
     header("Location: admin_add_product.php");
     exit;
 }
 
 // Check submitted login form
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST["username"];
-    $password = $_POST["password"];
+    $username = (string) ($_POST["username"] ?? '');
+    $password = (string) ($_POST["password"] ?? '');
 
-    // Replace with YOUR real credentials
-    $valid_username = "admin";
-    $valid_password = "admin";
-
-    if ($username === $valid_username && $password === $valid_password) {
+    if (adminCheckCredentials($username, $password)) {
+        // New session id after login, so a pre-set session id can't be hijacked
+        session_regenerate_id(true);
         $_SESSION["loggedin"] = true;
         header("Location: admin_add_product.php");
         exit;
     } else {
+        sleep(1); // slows down password guessing
         $error = "Invalid username or password!";
     }
 }

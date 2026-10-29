@@ -1,300 +1,378 @@
+/* =========================================================
+   ACCOUNT PAGE (account.php) — mobile-first
+   Loaded only on account.php; every rule is scoped to .account-page
+   so it can't leak into the header, basket or search form.
+   Breakpoints:
+     base      0–575px     phones
+     576px     large phones
+     768px     tablets (iPad portrait)
+     1024px    iPad landscape / laptops — sidebar moves to the left
+     1200px    desktops
+   ========================================================= */
 
 
+.account-page {
+    --gold: #d69c1c;
+    --gold-dark: #b87d00;
+    --gold-soft: #f2e7d2;
+    --line: #eeeeee;
+    --muted: #8A7F6D;
 
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f5efe7;
-    color:#222
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    font-family: Arial, sans-serif;
+    color: #222;
 }
-.nav{
-    background:#1f1f1f;
-    color:#fff;
-    padding:18px 40px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center
-}
-.nav .left a{
-    margin-right:25px
-}.logo{
-    font-size:48px;
-    color:#d69c1c;
-    font-family:Georgia,serif;
-}
-.container{
-    display:flex;
-    gap:30px;
-    padding:30px;
-}
-.sidebar{
-    width:30%;
-    background:#fff;
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 2px 10px rgba(0,0,0,.08)
-}
-.profile{
-    text-align:center
-}
-.avatar,.bigavatar{
-    background:#222;
-    color:#fff;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center
-}
-.avatar{width:80px;
-    height:80px;
-    margin:auto
-}
-.bigavatar{
-    width:120px;
-    height:120px;
-    font-size:48px;
-    margin:20px auto
-}
-.sidebar ul{
-    list-style:none;
-    padding:0
-}
-.sidebar li{
-    display:flex; align-items:center; gap:12px;
-    padding:11px 12px; border-radius:10px;
-    font-size:14.5px; color:#4b463c; cursor:pointer;
-    margin-bottom:2px;
-  }
-  .sidebar li:hover{background:#faf3e4;}
-  .sidebar li.active{background:var(--gold-soft); color:var(--gold-dark); font-weight:600;}
-  .sidebar li .ic{width:18px; text-align:center; opacity:.85;}
-  .sidebar .logout{color:#c0392b; margin-top:8px; border-top:1px solid var(--line); padding-top:14px;}
 
-.active{background:#f2e7d2;color:#b87d00;font-weight:bold}
-.logout{color:#c33}
-.content{flex:1}
-.tabs{display:flex;gap:30px;margin-bottom:20px}
-.grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}
-.card{background:#fff;padding:25px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-label{display:block;margin:12px 0}
-input{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px}
-button{
-    background:#d69c1c;
-    color:#fff;
-    border:none;
-    padding:12px 20px;
-    border-radius:8px;
-    cursor:pointer
+/* Sections that open from the sidebar must be able to shrink */
+.account-page > div {
+    min-width: 0;
 }
-button:hover{
-    opacity:.9
-}.danger{
-    margin-top:20px
-}.dangerbtn{background:#c62828}
 
-.dashboard {
+.account-page h1 {
+    font-size: 24px;
+    margin: 4px 0 8px;
+}
+
+/* ---------- Shared form controls & cards ---------- */
+.account-page label {
+    display: block;
+    margin: 12px 0;
+}
+
+.account-page input {
     width: 100%;
-
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;       /* 16px stops iPhone from zooming in on focus */
 }
 
-.dashboard button {
+.account-page button {
+    background: var(--gold);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.account-page button:hover {
+    opacity: .9;
+}
+
+.account-page .card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+}
+
+.account-page hr {
+    border-radius: 10px;
+    border: 0.5px solid #cdcdcd;
+}
+
+.account-page .danger {
+    margin-top: 20px;
+}
+.account-page .dangerbtn {
+    background: #c62828;
+}
+
+.account-page .tabs {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+/* Profile / Account Summary cards */
+.account-page .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.account-page .avatar,
+.account-page .bigavatar {
+    background: #222;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.account-page .avatar {
+    width: 56px;
+    height: 56px;
+}
+.account-page .bigavatar {
+    width: 120px;
+    height: 120px;
+    font-size: 48px;
+    margin: 20px auto;
+}
+
+/* ---------- Sidebar (phones: profile row + scrollable tabs) ---------- */
+.account-page .sidebar {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+}
+
+.account-page .profile {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+.account-page .profile h3 {
+    margin: 0 0 2px;
+}
+.account-page .profile p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+    overflow-wrap: anywhere;   /* long e-mails don't overflow */
+}
+
+.account-page .sidebar ul {
+    list-style: none;
+    display: flex;
+    gap: 6px;
+    margin: 14px -16px 0;
+    padding: 0 16px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.account-page .sidebar li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: #faf3e4;
+    font-size: 14.5px;
+    color: #4b463c;
+    cursor: pointer;
+}
+.account-page .sidebar li:hover {
+    background: #f5ead2;
+}
+.account-page .sidebar li.active {
+    background: var(--gold-soft);
+    color: var(--gold-dark);
+    font-weight: 600;
+}
+.account-page .sidebar hr {
+    display: none;
+}
+.account-page .sidebar .logout {
+    color: #c0392b;
+}
+
+/* Hidden until opened from the sidebar */
+.account-page .orders,
+.account-page .wishlist,
+.account-page .addresses,
+.account-page .paymantMethods,
+.account-page .accountSettings {
+    display: none;
+}
+
+/* ---------- Dashboard ---------- */
+.account-page .dashboard {
+    width: 100%;
+}
+
+.account-page .dashboard button {
     background: none;
-    color: #b87d00;
-    height: 10px;
+    color: var(--gold-dark);
     padding: 5px 0;
     margin: 0;
-
 }
 
-#dash-viewed {
-    width: 100%;
-    margin: 10px 0;
-    background:#fff;
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 2px 10px rgba(0,0,0,.08);
-}
-
-#dash-viewed-heading {
-    display: flex;
-    justify-content: space-between;
-}
-
-#dash-viewed-cont {
-    display: flex;
-}
-
-
-
-
-.viewedProduct {
-    padding: 10px;
-    border-radius: 10px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.viewedProduct img{
-    width:100%; 
-    aspect-ratio:1/1; 
-    object-fit:cover; 
-    border-radius:10px; 
-    margin-bottom:8px; 
-    background:#f1ead9;
-}
-.viewedProduct .name{
-    font-size:13.5px; 
-    font-weight:600;}
-.viewedProduct .price{
-    font-size:13px; 
-    color:var(--muted); 
-    margin-top:2px;}
-.viewedProduct:hover {
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); /* Add shadow */
-    transform: scale(1.05);
-    animation-duration: 1s;
-}
-
+#dash-viewed,
 #dash-orders {
     width: 100%;
-    margin: 10px 0;
-    background:#fff;
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 2px 10px rgba(0,0,0,.08);
+    margin: 12px 0;
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
 }
 
+#dash-viewed-heading,
 #dash-orders-heading {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
+/* Recently viewed: swipeable row on phones */
+#dash-viewed-cont {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+}
+
+.account-page .viewedProduct {
+    flex: 0 0 42%;
+    min-width: 0;
+    padding: 10px;
+    border-radius: 10px;
+    scroll-snap-align: start;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.account-page .viewedProduct img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: #f1ead9;
+}
+.account-page .viewedProduct h2 {
+    font-size: 15px;
+    margin: 0 0 4px;
+}
+.account-page .viewedProduct .price {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+@media (hover: hover) {
+    .account-page .viewedProduct:hover {
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        transform: scale(1.05);
+    }
+}
+
+/* ---------- Orders list ---------- */
 #dash-orders-cont {
     display: flex;
     flex-direction: column;
 }
 
-
-.orders-list {
-    width: 100%;
-    background: white;
-}
-
-.order {
-    display: flex;
-    justify-content: space-between;
+/* Phones: image | name + status | price */
+.account-page .order {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    grid-template-areas:
+        "img info   price"
+        "img status price";
+    column-gap: 12px;
+    row-gap: 6px;
     align-items: center;
-    min-height: 82px;
-    padding: 12px 0px;
-    border-bottom: 1px solid #eeeeee;
-    box-sizing: border-box;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
 }
-.order img {
-    width: 15%;
-    margin-right: 5%;
+.account-page .order img {
+    grid-area: img;
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
 }
-
-.order-info {
-    flex: 1;
+.account-page .order-info {
+    grid-area: info;
+    min-width: 0;
 }
-
-.order-number {
-    font-size: 17px;
+.account-page .order-number {
+    font-size: 15px;
     font-weight: 500;
     color: #222;
-    margin-bottom: 7px;
+    margin-bottom: 4px;
 }
-
-.order-date {
-    font-size: 14px;
+.account-page .order-date {
+    font-size: 13px;
     color: #888;
 }
 
-/* STATUS */
-
-.order-status {
-    padding: 8px 16px;
+.account-page .order-status {
+    grid-area: status;
+    justify-self: start;
+    padding: 4px 12px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    min-width: 66px;
     text-align: center;
 }
+.account-page .status-delivered  { background: #e6f4ea; color: #29904a; }
+.account-page .status-shipped    { background: #fff2d6; color: #d88a00; }
+.account-page .status-processing { background: #e5f0ff; color: #3578d4; }
+.account-page .status-cancelled  { background: #fde7e7; color: #d64545; }
+.account-page .status-pending    { background: #eeeeee; color: #666; }
 
-/* Green */
-
-.status-delivered {
-    background: #e6f4ea;
-    color: #29904a;
-}
-
-/* Orange */
-
-.status-shipped {
-    background: #fff2d6;
-    color: #d88a00;
-}
-
-/* Blue */
-
-.status-processing {
-    background: #e5f0ff;
-    color: #3578d4;
-}
-
-/* Red */
-
-.status-cancelled {
-    background: #fde7e7;
-    color: #d64545;
-}
-
-/* Gray */
-
-.status-pending {
-    background: #eeeeee;
-    color: #666;
-}
-
-
-/* PRICE */
-
-.order-price {
-    width: 90px;
+.account-page .order-price {
+    grid-area: price;
     text-align: right;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 500;
     color: #222;
+    white-space: nowrap;
 }
 
-
-/* ARROW */
-
-.order-arrow {
-    width: 35px;
-    text-align: center;
+.account-page .order-arrow {
+    display: none;
     font-size: 30px;
     font-weight: 300;
     color: #222;
     line-height: 1;
+    text-align: center;
 }
 
-
-hr {
-    border-radius: 10px;
-    border: 0.5px solid #cdcdcd;
-}
-
-#dash-section3 {
+/* Order status filter: scrollable tabs on phones */
+.account-page .orderSectionsList {
     display: flex;
-
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    border-bottom: 1px solid #e5e5e5;
 }
-#section3-details, #section3-addresses, #section3-paymants {
-    width: 33%;
-    margin: 10px;
+.account-page .orderSectionsList li {
+    position: relative;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #444;
+    cursor: pointer;
+}
+.account-page .orderSectionsList li.activeSec {
+    color: #111;
+    background: var(--gold-soft);
+    font-weight: bold;
 }
 
-/* Account Dashboard — Account Details / Saved Addresses / Payment Methods */
+.account-page .processing,
+.account-page .shipped,
+.account-page .delivered,
+.account-page .cancelled {
+    display: none;
+}
 
-.dash-card {
+/* ---------- Dashboard cards: details / addresses / payments ---------- */
+#dash-section3 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.account-page .dash-card {
+    min-width: 0;
     background: #FBF9F5;
     border: 1px solid #ECE5D8;
     border-radius: 14px;
@@ -302,13 +380,11 @@ hr {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: #3A342A;
 }
-
-.dash-card span:first-child {
+.account-page .dash-card span:first-child {
     font-size: 15px;
     font-weight: 600;
 }
-
-.dash-card button {
+.account-page .dash-card button {
     font-size: 13px;
     font-weight: 500;
     color: #C98A3E;
@@ -317,162 +393,302 @@ hr {
     padding: 0;
     cursor: pointer;
 }
-
-.dash-card button:hover {
+.account-page .dash-card button:hover {
     text-decoration: underline;
 }
 
-/* Account details rows */
-#account-details-content {
+#account-details-content,
+#addresses-content,
+#payments-content {
     margin-top: 16px;
 }
-
 #account-details-content > div {
     display: flex;
     flex-direction: column;
     margin-bottom: 12px;
 }
-
 #account-details-content span:first-child {
     font-size: 12px;
     font-weight: 400;
-    color: #8A7F6D;
+    color: var(--muted);
 }
-
 #account-details-content span:last-child {
     font-size: 14px;
+    overflow-wrap: anywhere;
 }
 
-/* Addresses */
-#addresses-content {
-    margin-top: 16px;
-}
-
-.address-item {
+.account-page .address-item {
     display: flex;
     gap: 10px;
     margin-bottom: 16px;
 }
-
-.address-item p {
+.account-page .address-item p {
     font-size: 13px;
     line-height: 1.5;
-    color: #8A7F6D;
+    color: var(--muted);
     margin: 4px 0 0;
 }
 
-.badge {
+.account-page .badge {
     font-size: 11px;
-    color: #8A7F6D;
+    color: var(--muted);
     background: #EFE7D8;
     border-radius: 999px;
     padding: 2px 10px;
     margin-left: 8px;
 }
 
-/* Payment methods */
-#payments-content {
-    margin-top: 16px;
-}
-
-.payment-item {
+.account-page .payment-item {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
 }
-
-.payment-item p {
+.account-page .payment-item p {
     font-size: 14px;
     margin: 0;
 }
-
-.payment-item span {
+.account-page .payment-item span {
     font-size: 13px;
-    color: #8A7F6D;
+    color: var(--muted);
 }
 
 /* Empty states (shared across all three cards) */
-.empty-state {
+.account-page .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     padding: 12px 8px 4px;
 }
-
-.empty-state img {
+.account-page .empty-state img {
     margin-bottom: 12px;
 }
-
-.empty-state p {
+.account-page .empty-state p {
     font-size: 14px;
     font-weight: 600;
     margin: 0 0 4px;
 }
-
-.empty-state span {
+.account-page .empty-state span {
     font-size: 13px;
-    color: #8A7F6D;
+    color: var(--muted);
     margin-bottom: 10px;
     max-width: 22ch;
 }
 
-
-
-/* @media(max-width:900px){
-    .grid{grid-template-columns:1fr}
-    .sidebar{width:42%}
-    .logo{font-size:34px}
-    #dash-viewed{
-        width: 65%;
-        display: flex;
-    }
-    #dash-orders {
-        width: 65%;
-    }
-    #dash1 {
-        flex-direction: column;
-    }
-} */
-
-
-.orders, .wishlist, .addresses, .paymantMethods, .accountSettings, .notifications{
-    display: none;
+/* ---------- Addresses section ---------- */
+.account-page .address-manager {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 16px;
 }
 
-.processing, .shipped, .delivered, .cancelled{
-    display: none;
-}
-.orderSectionsList {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-
-    border-bottom: 1px solid #e5e5e5;
+.account-page .address-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 16px;
 }
 
-.orderSectionsList li {
-    position: relative;
-    padding: 12px 20px;
-    font-size: 13px;
-    color: #444;
-    cursor: pointer;
+.account-page .address-notes {
+    grid-column: 1 / -1;
 }
 
-.orderSectionsList li.activeSec {
-    color: #111;
-    background: #f2e7d2;
-    font-weight: bold;
-}
-
-.orderSectionsList li.active::after {
-    content: "";
-    position: absolute;
-    bottom: -1px;
-    left: 0;
+.account-page .address-form textarea {
     width: 100%;
-    height: 2px;
-    background: #111;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    resize: vertical;
+    font: inherit;
+    font-size: 16px;
+}
+
+.account-page .saved-addresses-card h2,
+.account-page .address-form-card h2 {
+    margin-bottom: 12px;
+}
+
+.account-page .saved-address-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+}
+.account-page .saved-address-card:last-child { border-bottom: 0; }
+.account-page .saved-address-card strong,
+.account-page .saved-address-card span,
+.account-page .saved-address-card small { display: block; margin-bottom: 4px; }
+.account-page .saved-address-card span,
+.account-page .saved-address-card small { color: #666; font-size: 14px; }
+
+.account-page .address-actions { display: flex; align-items: flex-start; gap: 10px; }
+.account-page .address-actions a,
+.account-page .cancel-edit { color: var(--gold-dark); text-decoration: none; }
+.account-page .address-actions form { margin: 0; }
+.account-page .address-delete { background: none; color: #c62828; padding: 0; }
+.account-page .cancel-edit { margin-left: 12px; }
+.account-page .empty-addresses { color: #777; }
+
+.account-page .account-flash {
+    padding: 12px 14px;
+    margin: 14px 0;
+    border-radius: 8px;
+}
+.account-page .account-flash.success { background: #e6f4ea; color: #217a3c; }
+.account-page .account-flash.error   { background: #fde7e7; color: #b42318; }
+
+/* =========================================================
+   Large phones
+   ========================================================= */
+@media (min-width: 576px) {
+    .account-page .viewedProduct {
+        flex-basis: 30%;
+    }
+
+    .account-page .address-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* =========================================================
+   Tablets (iPad portrait)
+   ========================================================= */
+@media (min-width: 768px) {
+    .account-page {
+        padding: 24px;
+        gap: 20px;
+    }
+
+    .account-page h1 {
+        font-size: 30px;
+    }
+
+    .account-page .viewedProduct {
+        flex-basis: 23%;
+    }
+
+    /* Orders: one row — image | info | status | price | arrow */
+    .account-page .order {
+        grid-template-columns: 72px minmax(0, 1fr) auto 90px 24px;
+        grid-template-areas: "img info status price arrow";
+    }
+    .account-page .order img {
+        width: 72px;
+        height: 72px;
+    }
+    .account-page .order-status {
+        justify-self: center;
+        padding: 8px 16px;
+        min-width: 66px;
+    }
+    .account-page .order-arrow {
+        display: block;
+        grid-area: arrow;
+    }
+    .account-page .order-number {
+        font-size: 17px;
+    }
+
+    /* Details + addresses side by side, payments full width */
+    #dash-section3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #section3-paymants {
+        grid-column: 1 / -1;
+    }
+}
+
+/* =========================================================
+   iPad landscape / laptops — classic sidebar layout
+   ========================================================= */
+@media (min-width: 1024px) {
+    .account-page {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 30px;
+        padding: 30px;
+    }
+
+    .account-page .sidebar {
+        flex: 0 0 240px;
+        padding: 20px;
+        position: sticky;
+        top: 20px;
+    }
+
+    .account-page .profile {
+        flex-direction: column;
+        text-align: center;
+    }
+    .account-page .profile h3 {
+        margin-top: 4px;
+    }
+    .account-page .avatar {
+        width: 80px;
+        height: 80px;
+    }
+
+    .account-page .sidebar ul {
+        flex-direction: column;
+        gap: 2px;
+        margin: 16px 0 0;
+        padding: 0;
+        overflow: visible;
+    }
+    .account-page .sidebar li {
+        padding: 11px 12px;
+        border-radius: 10px;
+        background: none;
+    }
+    .account-page .sidebar li:hover {
+        background: #faf3e4;
+    }
+    .account-page .sidebar li.active {
+        background: var(--gold-soft);
+    }
+    .account-page .sidebar hr {
+        display: block;
+        width: 100%;
+    }
+
+    .account-page > div {
+        flex: 1;
+    }
+
+    .account-page .viewedProduct {
+        flex: 1 1 0;
+        max-width: 20%;
+    }
+    #dash-viewed-cont {
+        overflow-x: visible;
+    }
+
+    #dash-section3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #section3-paymants {
+        grid-column: auto;
+    }
+
+    .account-page .grid {
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+    }
+
+    .account-page .address-manager {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, .9fr);
+        gap: 20px;
+    }
+}
+
+/* =========================================================
+   Desktops
+   ========================================================= */
+@media (min-width: 1200px) {
+    .account-page {
+        max-width: 1280px;
+        margin: 0 auto;
+    }
 }

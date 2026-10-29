@@ -1,5 +1,6 @@
 <?php 
 
+$pageTitle = 'Log In / Register';
 include("header.php");
 
 if (isset($_GET['error'])) {
@@ -40,8 +41,6 @@ if (isset($_GET['error'])) {
                     
                 <input type="password" id="register-password" name="password" placeholder="Password" required><br>
                     
-                <input type="tel" id="register-phone" name="phone" placeholder="Phone" required><br>
-                                        
                 <button type="submit">Register</button>
             </form>
         </div>
@@ -67,4 +66,3 @@ if (isset($_GET['error'])) {
         }
     }
 </script>
-

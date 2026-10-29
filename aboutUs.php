@@ -1,11 +1,17 @@
-<?php include 'header.php'; ?>
+<?php
+$pageTitle = 'About Us';
+$pageStyles = ['aboutUs.css'];
+include 'header.php';
+?>
+
+<main class="about-page">
 
 <!-- Hero Section -->
-<section class="hero">
+<section class="about-banner">
     <?php include('slider_home.php') ?>
     <div class="about-hero">
-    <h1>About HoneyArt</h1>
-    <p>Crafting Pure Armenian Honey with Love and Passion</p>
+        <h1>About HoneyArt</h1>
+        <p>Crafting Pure Armenian Honey with Love and Passion</p>
     </div>
 </section>
 
@@ -36,7 +42,7 @@
         We aim to educate people about the importance of bees in our ecosystem and to promote sustainable beekeeping practices.
     </p>
     <div class="mission-images">
-        <img src="images/Beehives-in-mountains.jpg" alt="Beehives in mountains">
+        <img src="images/Beehives-in-mountains.webp" alt="Beehives in mountains">
         <img src="images/Fresh-honey-jars.webp" alt="Fresh honey jars">
         <img src="images/Honey-pouring.webp" alt="Honey pouring">
     </div>
@@ -69,8 +75,8 @@
 <section class="about-gallery">
     <h2>Gallery</h2>
     <div class="gallery-container">
-        <img src="images/Bee-on-flower.jpg" alt="Bee on flower">
-        <img src="images/Honeycomb-closeup.jpg" alt="Honeycomb closeup">
+        <img src="images/Bee-on-flower.webp" alt="Bee on flower">
+        <img src="images/Honeycomb-closeup.webp" alt="Honeycomb closeup">
         <img src="images/Forest-honey.jpeg" alt="Forest honey">
         <img src="images/Beekeeping-tools.jpeg" alt="Beekeeping tools">
     </div>
@@ -82,5 +88,7 @@
     <p>We love sharing our passion for honey! Reach out to learn more about our products or visit our apiaries.</p>
     <a href="support.php" class="contact-btn">Contact Us</a>
 </section>
+
+</main>
 
 <?php include 'footer.php'; ?>

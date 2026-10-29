@@ -17,11 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user_id = $_SESSION['user_id'];
 
         // Կապ ենք հաստատում MySQL-ի հետ
-        $conn = new mysqli("localhost", "root", "root", "honey_art_db");
-
-        if ($conn->connect_error) {
-            die("Connection failed: " . $conn->connect_error);
-        }
+        require_once __DIR__ . '/db.php';
 
         // Ստուգում ենք՝ արդյոք արդեն կա այդ ապրանքը զամբյուղում
         $sql_check = "SELECT * FROM cart WHERE user_id = ? AND product_id = ?";

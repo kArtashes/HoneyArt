@@ -1,10 +1,10 @@
-<?php include 'header.php'; ?>
+<?php
+$pageTitle = '';
+include 'header.php';
+?>
 
 <?php
-    $conn = new mysqli("localhost", "root", "root", "honey_art_db", 8889);
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
+    require_once __DIR__ . '/db.php';
 
     $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC LIMIT 3");
 ?>
@@ -20,17 +20,17 @@
 
 <section class="featured-products">
     <h2>Featured Products</h2>
-<div id="products" style="flex-wrap: nowrap;">
+<div id="products">
         <?php if ($result->num_rows > 0): ?>
             <?php while ($row = $result->fetch_assoc()): ?>
                 <div class="product" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
                     <?php if (!empty($row["image_data"])): ?>
                         <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                     <?php else: ?>
-                        <img src="default.png" alt="No Image">
+                        <img src="images/default.webp" alt="No Image">
                     <?php endif; ?>
                     <h2><?php echo htmlspecialchars($row['name']); ?></h2>
-                    <div class="price">$<?php echo number_format($row['price'], 0); ?></div>
+                    <div class="price">֏<?php echo number_format($row['price'], 0); ?></div>
                 </div>
             <?php endwhile; ?>
         <?php else: ?>
@@ -50,13 +50,10 @@
                     <?php if (!empty($row["image_data"])): ?>
                         <img src="post_image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['title']); ?>">
                     <?php else: ?>
-                        <img src="default.png" alt="No Image">
+                        <img src="images/default.webp" alt="No Image">
                     <?php endif; ?>
                     <h2><?php echo htmlspecialchars($row['title']); ?></h2>
-                    <form method="POST">
-                        <input type="hidden" name="post_id" value="<?php echo $row['id'] ?>">
-                        <button type="submit">See more</button>
-                    </form>
+                    <a class="see-more" href="blog.php?id=<?php echo (int) $row['id']; ?>">See more</a>
                 </div>
             <?php endwhile; ?>
         <?php else: ?>
@@ -67,4 +64,4 @@
 
 <?php include 'footer.php'; ?>
 
-<link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="<?php echo asset('home.css'); ?>">

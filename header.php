@@ -1,3 +1,10 @@
+<?php
+// The session must start before any HTML is sent (otherwise it fails on servers without output buffering)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/asset.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,23 +16,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="header.css">
-    <link rel="stylesheet" href="logInReg.css">
-    <link rel="stylesheet" href="footer.css">
-    <link rel="stylesheet" href="personalAccount.css">
-    <link rel="stylesheet" href="products.css">
-    <link rel="stylesheet" href="product.css">
-    <link rel="stylesheet" href="cart.css">
-    <link rel="stylesheet" href="support.css">
-    <link rel="stylesheet" href="blogs.css">
-    <link rel="stylesheet" href="blog.css">
-    <link rel="stylesheet" href="search_form.css">
-    <!-- <link rel="stylesheet" href="aboutUs.css"> -->
-    <link rel="stylesheet" href="accountstyle.css">
+    <link rel="stylesheet" href="<?php echo asset('header.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('logInReg.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('footer.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('products.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('product.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('cart.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('support.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('blogs.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('blog.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('search_form.css'); ?>">
+    <?php // Page-specific stylesheets: set $pageStyles = ['file.css'] before including header.php ?>
+    <?php foreach ($pageStyles ?? [] as $pageStyle): ?>
+    <link rel="stylesheet" href="<?php echo asset($pageStyle); ?>">
+    <?php endforeach; ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="format-detection" content="telephone=no">
-    <title>Document</title>
+    <?php // Each page can set $pageTitle before including header.php ?>
+    <title><?php echo htmlspecialchars(!empty($pageTitle) ? $pageTitle . ' | HoneyArt' : 'HoneyArt — Pure Armenian Honey'); ?></title>
 </head>
 <body>
     <header>
@@ -49,7 +58,7 @@
                 </a>
 
                 <div id="section-2">
-                    <button onclick="searchShow()"><img id="search-icon" src="./images/search-icon.png" alt=""></button>
+                    <button class="desktop-search" onclick="searchShow()"><img id="search-icon" src="./images/search-icon.png" alt=""></button>
                     <button class="basket-icon" onclick="openBasket()"><img id="basket-icon" src="./images/basket.png" alt=""></button>
                     <button onclick="window.location.href='account.php'"><img id="account-icon" src="./images/personalAccount.png" alt=""></button>
                 </div>
@@ -58,15 +67,7 @@
     </header>
 
     <?php 
-        $host = 'localhost';
-        $username = 'root';
-        $password = "root";
-        $db_name = 'honey_art_db';
-        $conn = new mysqli($host, $username, $password, $db_name);
-
-        if ($conn->connect_error) {
-            die('error: ' . $conn->connect_error);
-        }
+        require_once __DIR__ . '/db.php';
     ?>
 
 
@@ -74,11 +75,6 @@
     <div class="basket-overlay" onclick="closeBasket()"></div>
 
     <!-- Basket Panel -->
-     <?php 
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-     ?>
     <div class="basket-panel">
         <div id="basket-heading">
             <span>Your Basket</span>
@@ -107,10 +103,10 @@
         <div class="free-sheeping-block">
             <?php if($total_price >= $free_shipping_limit): ?>
                 <span class="free-sheeping-success">Congratulations! Your order qualifies for free shipping</span>
-                <span class="free-sheeping-default" style="display:none;">You are <span><?php echo number_format($amount_left,2); ?>֏</span> away from free shipping.</span>
+                <span class="free-sheeping-default" style="display:none;">You are ֏<span><?php echo number_format($amount_left); ?></span> away from free shipping.</span>
             <?php else: ?>
                 <span class="free-sheeping-success" style="display:none;">Congratulations! Your order qualifies for free shipping</span>
-                <span class="free-sheeping-default">You are <span><?php echo number_format($amount_left); ?></span>֏ away from free shipping.</span>
+                <span class="free-sheeping-default">You are ֏<span><?php echo number_format($amount_left); ?></span> away from free shipping.</span>
             <?php endif; ?>
 
             <progress value="<?php echo $total_price; ?>" max="<?php echo $free_shipping_limit; ?>"></progress>
@@ -142,7 +138,7 @@
                 $free_shipping_limit = 40000;
                 $amount_left = max($free_shipping_limit - $total_price, 0);
             ?>
-            <form action="checkout.php" method="post" id="checkout-form">
+            <form action="checkout.php" method="get" id="checkout-form">
                 <button type="submit" class="checkout-btn">CHECK OUT</button>
             </form>
         </div>
@@ -210,7 +206,7 @@
 
                 // Update total price
                 const totalPriceEl = document.querySelector('.total-price');
-                if (totalPriceEl) totalPriceEl.textContent = '֏' + total_price.toLocaleString();
+                if (totalPriceEl) totalPriceEl.textContent = '֏' + total_price.toLocaleString('en-US');
 
                 // Update item quantity or remove
                 if (quantity === 0 || action === 'remove') {
@@ -240,7 +236,7 @@
                     } else {
                         if (successMsg) successMsg.style.display = 'none';
                         if (defaultMsg) defaultMsg.style.display = 'inline';
-                        if (numInDefMs) numInDefMs.textContent = (freeShippingLimit - total_price);
+                        if (numInDefMs) numInDefMs.textContent = (freeShippingLimit - total_price).toLocaleString('en-US');
                     }
 
                     if (progressEl) progressEl.value = total_price;

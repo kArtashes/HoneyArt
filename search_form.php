@@ -1,7 +1,6 @@
 <form action="search.php" method="GET" id="search-row">
     <button type="submit"><img id="search-form-icon" src="./images/search-form-icon.png" alt=""></button>
     <input id="searchInput" type="text" name="searchValue" placeholder="Search...">
-    <input type="hidden" name="searchValue" id="searchValue">
     <button onclick="searchClose()" type="button">x</button>
 </form>
 <div id="search-overlay">
@@ -11,29 +10,14 @@
 </div>
 <script>
     function searchShow(){
-        let search = document.getElementById("search-row");
-        search.classList.add("show");
-        let searchRes =document.getElementById("searchResults");
-        searchRes.style.display='block';
-        let searchOverlay =document.getElementById("search-overlay");
-        searchOverlay.style.display='block';
+        document.getElementById("search-row").classList.add("show");
+        document.getElementById("search-overlay").classList.add("show");
+        document.getElementById("searchInput").focus();
     }
     function searchClose(){
-        let search = document.getElementById("search-row");
-        search.classList.remove("show");
-        let searchRes =document.getElementById("searchResults");
-        searchRes.style.display='none';
-        let searchOverlay =document.getElementById("search-overlay");
-        searchOverlay.style.display='none';
+        document.getElementById("search-row").classList.remove("show");
+        document.getElementById("search-overlay").classList.remove("show");
     }
-
-    const hiddenInput = document.getElementById('searchValue');
-    const input =document.getElementById('searchInput');
-    input.addEventListener('input', function(){
-        hiddenInput.value = this.value; 
-        console.log(hiddenInput.value);
-    })
-    
 </script>
 
 
@@ -47,7 +31,7 @@
             var inputText = $(this).val();
             // alert(inputText);
 
-            if(input != ""){
+            if(inputText != ""){
                 $.ajax({
                     url:"search.php",
                     method:"POST",
@@ -57,12 +41,11 @@
                         $("#searchResults").html(data);
                     }
                 })
-                $("#search-overlay").css("display", "block");
+                $("#searchResults").show();
             }
             else{
-                $("#searchResults").css("display", "none");
+                $("#searchResults").empty().hide();
             }
         });
     });
 </script>
-
