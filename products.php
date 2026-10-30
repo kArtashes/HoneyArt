@@ -7,6 +7,10 @@ require_once __DIR__ . '/db.php';
 
 $user_id = $_SESSION['user_id'] ?? 0;
 
+// ?q=... comes from the search bar (Enter / "See all results")
+$searchQuery = trim((string) ($_GET['q'] ?? ''));
+$searchLike = '%' . addcslashes($searchQuery, '%_\\') . '%';
+
 $stmt = $conn->prepare("
     SELECT 
         p.*,
@@ -15,25 +19,36 @@ $stmt = $conn->prepare("
     LEFT JOIN wishlist w 
         ON p.id = w.product_id
         AND w.user_id = ?
+    WHERE ? = '' OR p.name LIKE ? OR p.category LIKE ?
     ORDER BY p.created_at DESC
 ");
 
-$stmt->bind_param("i", $user_id);
+$stmt->bind_param("isss", $user_id, $searchQuery, $searchLike, $searchLike);
 $stmt->execute();
 
 $result = $stmt->get_result();
 
-$pageTitle = 'All Products';
+$pageTitle = $searchQuery === '' ? 'All Products' : 'Search: ' . $searchQuery;
 include('header.php'); ?>
 
 <div id="product_general_image">
     <img src="./images/products_general1.webp" alt="">
     <div>
-        <span>All Products</span>
+        <span><?php echo $searchQuery === '' ? 'All Products' : 'Search results'; ?></span>
     </div>
 </div>
 
 
+
+<?php if ($searchQuery !== '' && $result->num_rows > 0): ?>
+    <div class="search-summary">
+        <span>
+            <?php echo $result->num_rows; ?> result<?php echo $result->num_rows === 1 ? '' : 's'; ?>
+            for “<?php echo htmlspecialchars($searchQuery); ?>”
+        </span>
+        <a href="products.php">Show all products</a>
+    </div>
+<?php endif; ?>
 
 <div id="products">
         <?php if ($result->num_rows > 0): ?>
@@ -71,7 +86,11 @@ include('header.php'); ?>
                 </div>
             <?php endwhile; ?>
         <?php else: ?>
-            <p>No products found.</p>
+            <?php if ($searchQuery !== ''): ?>
+                <p class="products-empty">No products match “<?php echo htmlspecialchars($searchQuery); ?>”. Try another word, or <a href="products.php">see all products</a>.</p>
+            <?php else: ?>
+                <p class="products-empty">No products found.</p>
+            <?php endif; ?>
         <?php endif; ?>
 </div>
 

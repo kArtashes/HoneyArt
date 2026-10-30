@@ -172,6 +172,31 @@
     opacity: .9;
 }
 
+/* "3 results for …" line above the grid when searching */
+.search-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 16px;
+    max-width: 1200px;
+    margin: 20px auto 0;
+    padding: 0 16px;
+    font-size: 16px;
+    color: #2d261c;
+}
+.search-summary a,
+.products-empty a {
+    color: #b87d00;
+    font-weight: 500;
+}
+.products-empty {
+    grid-column: 1 / -1;
+    padding: 24px 0;
+    text-align: center;
+    color: #6e6555;
+}
+
 /* Hover effects only on devices with a real mouse */
 @media (hover: hover) {
     .product:hover {

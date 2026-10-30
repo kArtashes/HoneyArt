@@ -17,7 +17,7 @@ $email = trim($_POST['email'] ?? '');
 $plainPassword = $_POST['password'] ?? '';
 
 if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($plainPassword) < 8) {
-    header('Location: logInReg.php?error=Please+enter+a+name%2C+valid+email%2C+and+a+password+of+at+least+8+characters.');
+    header('Location: logInReg.php?error=register_invalid');
     exit();
 }
 
@@ -36,7 +36,6 @@ try {
     header('Location: account.php');
     exit();
 } catch (mysqli_sql_exception $e) {
-    header('Location: logInReg.php?error=This+email+is+already+registered.');
+    header('Location: logInReg.php?error=email_taken');
     exit();
 }
-?>

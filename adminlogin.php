@@ -1,5 +1,7 @@
 <?php
 require __DIR__ . '/admin_auth.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/login_limiter.php';
 
 // Check if already logged in
 if (($_SESSION["loggedin"] ?? false) === true) {
@@ -12,14 +14,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = (string) ($_POST["username"] ?? '');
     $password = (string) ($_POST["password"] ?? '');
 
-    if (adminCheckCredentials($username, $password)) {
+    if (tooManyLoginAttempts($conn, 'admin', $username)) {
+        $error = "Too many attempts. Please wait 15 minutes and try again.";
+    } elseif (adminCheckCredentials($username, $password)) {
+        clearFailedLogins($conn, 'admin', $username);
         // New session id after login, so a pre-set session id can't be hijacked
         session_regenerate_id(true);
         $_SESSION["loggedin"] = true;
         header("Location: admin_add_product.php");
         exit;
     } else {
-        sleep(1); // slows down password guessing
+        recordFailedLogin($conn, 'admin', $username); // also waits 1 second
         $error = "Invalid username or password!";
     }
 }
@@ -73,7 +78,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
     <form method="post">
         <h2>Admin Login</h2>
-        <?php if (!empty($error)) echo "<div class='error'>$error</div>"; ?>
+        <?php if (!empty($error)) echo "<div class='error'>" . htmlspecialchars($error) . "</div>"; ?>
         <input type="text" name="username" placeholder="Username" required />
         <input type="password" name="password" placeholder="Password" required />
         <button type="submit">Login</button>

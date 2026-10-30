@@ -1,8 +1,8 @@
 <?php
-// Social pages: paste the full address (https://...) and the icon becomes a link
+// Social pages: an icon appears only when its address (https://...) is filled in
 $socialLinks = [
-    'Facebook'  => ['icon' => 'facebook.png',   'style' => 'width: 20px; height: 35px;', 'url' => ''],
-    'Instagram' => ['icon' => 'insta_icon.png', 'style' => 'width: 30px; height: 30px;', 'url' => ''],
+    'Facebook'  => ['icon' => 'facebook.png',   'style' => 'width: 20px; height: 35px;', 'url' => 'https://www.facebook.com/profile.php?id=61595853609957'],
+    'Instagram' => ['icon' => 'insta_icon.png', 'style' => 'width: 30px; height: 30px;', 'url' => 'https://www.instagram.com/honeyart.am/'],
     'YouTube'   => ['icon' => 'youtube_icon.png', 'style' => 'width: 35px; height: 25px;', 'url' => ''],
 ];
 ?>
@@ -12,11 +12,10 @@ $socialLinks = [
             <img class="footer-logo" src="./images/header_logo.png" alt="HoneyArt" />
             <div class="footer-social-media">
                 <?php foreach ($socialLinks as $name => $social): ?>
-                    <?php $icon = '<img src="./images/' . $social['icon'] . '" alt="' . $name . '" style="' . $social['style'] . '"/>'; ?>
                     <?php if ($social['url'] !== ''): ?>
-                        <a class="footer-social-link" href="<?php echo htmlspecialchars($social['url']); ?>" target="_blank" rel="noopener" aria-label="<?php echo $name; ?>"><?php echo $icon; ?></a>
-                    <?php else: ?>
-                        <span class="footer-social-link"><?php echo $icon; ?></span>
+                        <a class="footer-social-link" href="<?php echo htmlspecialchars($social['url']); ?>" target="_blank" rel="noopener" aria-label="<?php echo $name; ?>">
+                            <img src="./images/<?php echo $social['icon']; ?>" alt="<?php echo $name; ?>" style="<?php echo $social['style']; ?>"/>
+                        </a>
                     <?php endif; ?>
                 <?php endforeach; ?>
             </div>

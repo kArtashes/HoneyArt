@@ -98,3 +98,14 @@
         display: none;
     } */
 }
+
+/* Log-in / registration messages */
+.login-message {
+    max-width: 260px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+.login-message.error   { background: #fde7e7; color: #b42318; }
+.login-message.success { background: #e6f4ea; color: #217a3c; }

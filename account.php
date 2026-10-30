@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
     session_destroy();
     setcookie('remember_token', '', time() - 3600, '/');
 
-    header('Location: logInReg.php?account_deleted=1');
+    header('Location: logInReg.php?notice=account_deleted');
     exit();
   } catch (mysqli_sql_exception $e) {
     $conn->rollback();

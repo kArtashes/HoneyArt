@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Ստուգում ենք՝ մուտք գործած է, թե ոչ
 if (!isset($_SESSION['user_id'])) {
     // Եթե չէ՝ հետ ենք ուղարկում login էջ
-    header("Location: logInReg.php?message=Please login to add products to cart.");
+    header('Location: logInReg.php?error=login_required');
     exit();
 }
 
