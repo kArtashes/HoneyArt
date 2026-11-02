@@ -109,7 +109,7 @@ if (isset($_GET['edit'])) {
 
 
 
-$result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
+$result = $conn->query("SELECT id, title, description, (image_data IS NOT NULL) AS has_image FROM blog_posts ORDER BY created_at DESC");
 
 ?>
 
@@ -121,6 +121,7 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
     <title>Admin Panel - HoneyArt</title>
     <style>
         body {
@@ -276,7 +277,7 @@ $result = $conn->query("SELECT * FROM blog_posts ORDER BY created_at DESC");
             <?php while ($row = $result->fetch_assoc()): ?>
                 <tr>
                     <td>
-                        <?php if (!empty($row["image_data"])): ?>
+                        <?php if (!empty($row["has_image"])): ?>
                             <img src="post_image.php?id=<?php echo $row["id"]; ?>" class="thumbnail" />
                         <?php else: ?>
                             No Image

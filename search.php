@@ -6,7 +6,7 @@ require_once __DIR__ . '/db.php';
 
 const SEARCH_LIVE_LIMIT = 6;
 
-$query = trim((string) ($_GET['q'] ?? ''));
+$query = requestString($_GET, 'q');
 if ($query === '') {
     exit;
 }
@@ -19,14 +19,14 @@ $startsWith = addcslashes($query, '%_\\') . '%';
 $stmt = $conn->prepare(
     "SELECT id, name, price, weight_kg, image_data IS NOT NULL AS has_image
      FROM products
-     WHERE name LIKE ? OR category LIKE ?
+     WHERE is_hidden = 0 AND (name LIKE ? OR category LIKE ?)
      ORDER BY name LIKE ? DESC, name LIKE ? DESC, name
      LIMIT " . SEARCH_LIVE_LIMIT
 );
 $stmt->bind_param('ssss', $like, $like, $startsWith, $like);
 $stmt->execute();
 $products = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$countStmt = $conn->prepare('SELECT COUNT(*) FROM products WHERE name LIKE ? OR category LIKE ?');
+$countStmt = $conn->prepare('SELECT COUNT(*) FROM products WHERE is_hidden = 0 AND (name LIKE ? OR category LIKE ?)');
 $countStmt->bind_param('ss', $like, $like);
 $countStmt->execute();
 $total = (int) $countStmt->get_result()->fetch_row()[0];

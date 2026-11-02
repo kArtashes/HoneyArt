@@ -9,6 +9,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 
 // Connect to DB
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/orders_lib.php';
 
 $statuses = [
     'all' => 'All orders',
@@ -37,8 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order_status']
     $newStatus = $_POST['order_status'] ?? '';
     $returnStatus = $_POST['return_status'] ?? 'all';
     $returnUserId = filter_input(INPUT_POST, 'return_user_id', FILTER_VALIDATE_INT) ?: 0;
+    $returnView = filter_input(INPUT_POST, 'return_view', FILTER_VALIDATE_INT) ?: 0;
 
-    $redirectQuery = http_build_query([
+    $redirectQuery = http_build_query($returnView ? ['view' => $returnView] : [
         'status' => array_key_exists($returnStatus, $statuses) ? $returnStatus : 'all',
         'user_id' => $returnUserId ?: null,
     ]);
@@ -48,18 +50,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order_status']
     } elseif (!$orderId || !isset($statuses[$newStatus]) || $newStatus === 'all') {
         $_SESSION['order_flash'] = ['type' => 'error', 'text' => 'Please select a valid order status.'];
     } else {
-        $updateStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $updateStmt->bind_param('si', $newStatus, $orderId);
-        $updateStmt->execute();
+        try {
+            $conn->begin_transaction();
 
-        $_SESSION['order_flash'] = $updateStmt->affected_rows >= 0
-            ? ['type' => 'success', 'text' => 'Order status updated successfully.']
-            : ['type' => 'error', 'text' => 'Order could not be updated.'];
-        $updateStmt->close();
+            $orderStmt = $conn->prepare('SELECT status, stock_deducted FROM orders WHERE id = ? FOR UPDATE');
+            $orderStmt->bind_param('i', $orderId);
+            $orderStmt->execute();
+            $order = $orderStmt->get_result()->fetch_assoc();
+            $orderStmt->close();
+
+            if (!$order) {
+                throw new RuntimeException('Order not found.');
+            }
+
+            $itemsStmt = $conn->prepare(
+                'SELECT i.product_id, i.quantity, p.name
+                 FROM order_items i
+                 JOIN products p ON p.id = i.product_id
+                 WHERE i.order_id = ?
+                 ORDER BY i.product_id'
+            );
+            $itemsStmt->bind_param('i', $orderId);
+            $itemsStmt->execute();
+            $items = $itemsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $itemsStmt->close();
+
+            $stockDeducted = (int) $order['stock_deducted'];
+
+            if ($newStatus === 'cancelled' && $stockDeducted === 1) {
+                // Cancelled: every product of the order goes back to stock
+                $stockStmt = $conn->prepare('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?');
+                foreach ($items as $item) {
+                    $quantity = (int) $item['quantity'];
+                    $productId = (int) $item['product_id'];
+                    $stockStmt->bind_param('ii', $quantity, $productId);
+                    $stockStmt->execute();
+                }
+                $stockStmt->close();
+                $stockDeducted = 0;
+            } elseif ($newStatus !== 'cancelled' && $order['status'] === 'cancelled' && $stockDeducted === 0) {
+                // A cancelled order is active again: take the products back out, if they are all still there
+                $stockStmt = $conn->prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity >= ?');
+                foreach ($items as $item) {
+                    $quantity = (int) $item['quantity'];
+                    $productId = (int) $item['product_id'];
+                    $stockStmt->bind_param('iii', $quantity, $productId, $quantity);
+                    $stockStmt->execute();
+                    if ($stockStmt->affected_rows !== 1) {
+                        throw new RuntimeException('Not enough “' . $item['name'] . '” in stock to reactivate this order.');
+                    }
+                }
+                $stockStmt->close();
+                $stockDeducted = 1;
+            }
+
+            $updateStmt = $conn->prepare('UPDATE orders SET status = ?, stock_deducted = ? WHERE id = ?');
+            $updateStmt->bind_param('sii', $newStatus, $stockDeducted, $orderId);
+            $updateStmt->execute();
+            $updateStmt->close();
+
+            $conn->commit();
+            $_SESSION['order_flash'] = ['type' => 'success', 'text' => 'Order status updated successfully.'];
+        } catch (RuntimeException $e) {
+            // Includes database errors (mysqli_sql_exception is a RuntimeException)
+            $conn->rollback();
+            $_SESSION['order_flash'] = ['type' => 'error', 'text' => $e instanceof mysqli_sql_exception
+                ? 'Order could not be updated.'
+                : $e->getMessage()];
+        }
     }
 
     header('Location: admin_orders.php?' . $redirectQuery);
     exit;
+}
+
+// admin_orders.php?view=30 shows one order instead of the list
+$viewOrderId = filter_input(INPUT_GET, 'view', FILTER_VALIDATE_INT) ?: 0;
+$viewOrder = $viewOrderId > 0 ? getOrderDetails($conn, $viewOrderId) : null;
+if ($viewOrderId > 0 && !$viewOrder) {
+    $_SESSION['order_flash'] = ['type' => 'error', 'text' => 'Order #' . $viewOrderId . ' was not found.'];
+}
+
+function renderOrderStatusForm(array $order, string $returnStatus, int $returnUserId, int $returnView): void
+{
+    $orderStatus = strtolower((string) $order['status']);
+    ?>
+    <form method="POST" class="status-form" action="admin_orders.php">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['admin_csrf_token']) ?>">
+        <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+        <input type="hidden" name="return_status" value="<?= htmlspecialchars($returnStatus) ?>">
+        <input type="hidden" name="return_user_id" value="<?= $returnUserId ?>">
+        <input type="hidden" name="return_view" value="<?= $returnView ?>">
+        <select name="order_status" aria-label="Status of order #<?= (int) $order['id'] ?>">
+            <?php foreach (['processing', 'shipped', 'delivered', 'cancelled'] as $statusOption): ?>
+                <option value="<?= $statusOption ?>" <?= $orderStatus === $statusOption ? 'selected' : '' ?>>
+                    <?= ucfirst($statusOption) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" name="update_order_status">Update</button>
+    </form>
+    <?php
 }
 
 // The customer list is limited by the currently selected status.
@@ -113,6 +204,8 @@ $statusCountStmt->close();
 
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
     <title>Admin Panel - HoneyArt</title>
     <style>
         /* Same base look as the other admin pages */
@@ -364,6 +457,47 @@ $statusCountStmt->close();
 
 
 
+        /* ---------- One order ---------- */
+        .order-number a { color: inherit; }
+        .order-arrow { text-decoration: none; }
+        .order-view { max-width: 820px; }
+        .order-back { display: inline-block; margin-bottom: 12px; }
+        .order-view-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 16px;
+            margin-bottom: 16px;
+        }
+        .order-view-head h2 { margin: 0; }
+        .order-view-head .status-form { margin-left: 0; }
+        .order-card {
+            padding: 16px 18px;
+            margin-bottom: 14px;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+        }
+        .order-card h3 { margin: 0 0 10px; }
+        .order-card p { margin: 0 0 4px; line-height: 1.5; }
+        .order-note { color: #777; }
+        .order-line {
+            display: grid;
+            grid-template-columns: 56px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .order-line img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
+        .order-total-row {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 12px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
         /* ---------- Phones & small tablets ---------- */
         @media (max-width: 767px) {
             body {
@@ -434,6 +568,55 @@ $statusCountStmt->close();
                 <?= htmlspecialchars($flash['text']) ?>
             </div>
         <?php endif; ?>
+        <?php if ($viewOrder): ?>
+            <?php $deliveryLines = orderDeliveryLines($viewOrder); ?>
+            <div class="order-view">
+                <a class="order-back" href="admin_orders.php">← All orders</a>
+                <div class="order-view-head">
+                    <div>
+                        <h2>Order #<?= (int) $viewOrder['id'] ?></h2>
+                        <div class="order-date"><?= date('F j, Y, H:i', strtotime($viewOrder['created_at'])) ?></div>
+                    </div>
+                    <div class="order-status <?= orderStatusClass((string) $viewOrder['status']) ?>"><?= htmlspecialchars((string) $viewOrder['status']) ?></div>
+                    <?php renderOrderStatusForm($viewOrder, 'all', 0, (int) $viewOrder['id']); ?>
+                </div>
+
+                <section class="order-card">
+                    <h3>Customer</h3>
+                    <p><?= htmlspecialchars($viewOrder['username']) ?> (user id: <?= (int) $viewOrder['user_id'] ?>)</p>
+                    <p><a href="mailto:<?= htmlspecialchars($viewOrder['email']) ?>"><?= htmlspecialchars($viewOrder['email']) ?></a></p>
+                </section>
+
+                <section class="order-card">
+                    <h3>Delivery address</h3>
+                    <?php if ($deliveryLines): ?>
+                        <?php foreach ($deliveryLines as $line): ?>
+                            <p><?= htmlspecialchars($line) ?></p>
+                        <?php endforeach; ?>
+                        <?php if (!empty($viewOrder['delivery_notes'])): ?>
+                            <p class="order-note">Notes: <?= htmlspecialchars($viewOrder['delivery_notes']) ?></p>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <p class="order-note">This older order has no saved delivery address.</p>
+                    <?php endif; ?>
+                </section>
+
+                <section class="order-card">
+                    <h3>Products</h3>
+                    <?php foreach ($viewOrder['items'] as $item): ?>
+                        <div class="order-line">
+                            <img loading="lazy" src="<?= !empty($item['has_image']) ? 'image.php?id=' . (int) $item['product_id'] : 'images/default.webp' ?>" alt="">
+                            <div>
+                                <div><?= htmlspecialchars($item['name']) ?></div>
+                                <div class="order-date"><?= (int) $item['quantity'] ?> × ֏<?= number_format($item['unit_price'], 0) ?></div>
+                            </div>
+                            <strong>֏<?= number_format($item['unit_price'] * $item['quantity'], 0) ?></strong>
+                        </div>
+                    <?php endforeach; ?>
+                    <div class="order-total-row"><span>Total</span><span>֏<?= number_format($viewOrder['total'], 0) ?></span></div>
+                </section>
+            </div>
+        <?php else: ?>
         <ul class="orderSectionsList">
             <?php foreach ($statuses as $status => $label): ?>
                 <?php
@@ -472,130 +655,45 @@ $statusCountStmt->close();
                 <a class="clear-filters" href="admin_orders.php">Clear filters</a>
             <?php endif; ?>
         </form>
-        <?php
-        function showOrders($conn, $status, $userId)
-        {
-            $activeStatus = $status;
-
-            $sql = "SELECT 
-                    orders.id,
-                    orders.user_id,
-                    orders.product_id,
-                    orders.quantity,
-                    orders.status,
-                    orders.created_at,
-                    products.name,
-                    orders.unit_price AS price,
-                    products.image_data,
-                    products.image_type,
-                    users.username
-                FROM orders
-                JOIN products ON orders.product_id = products.id
-                JOIN users ON orders.user_id = users.id
-                WHERE (? = 'all' OR orders.status = ?)
-                  AND (? = 0 OR orders.user_id = ?)
-                ORDER BY orders.created_at DESC";
-
-            $stmt = $conn->prepare($sql);
-
-            $stmt->bind_param("ssii", $status, $status, $userId, $userId);
-
-            $stmt->execute();
-
-            $result = $stmt->get_result();
-
-            if ($result->num_rows === 0) {
-                echo '<p class="empty-orders">No orders found for the selected filters.</p>';
-                return;
-            }
-
-            while ($order = $result->fetch_assoc()) {
-
-
-                $orderStatus = strtolower($order['status']);
-
-                switch ($orderStatus) {
-                    case 'delivered':
-                        $statusClass = 'status-delivered';
-                        break;
-
-                    case 'shipped':
-                        $statusClass = 'status-shipped';
-                        break;
-
-                    case 'processing':
-                        $statusClass = 'status-processing';
-                        break;
-
-                    case 'cancelled':
-                        $statusClass = 'status-cancelled';
-                        break;
-
-                    default:
-                        $statusClass = 'status-pending';
-                }
-
-                ?>
-                <div class="order">
-                    <?php
-                    if (!empty($order["image_data"])): ?>
-                        <img src="image.php?id=<?php echo $order['product_id']; ?>"
-                            alt="<?php echo htmlspecialchars($order['name']); ?>">
-                    <?php else: ?>
-                        <img src="images/default.webp" alt="No Image">
-                    <?php endif; ?>
-                    <div class="order-info">
-                        <div class="order-number">
-                            #<?= htmlspecialchars($order['id']) ?>
-                            - <?= htmlspecialchars($order['name']) ?><?= (int) $order['quantity'] > 1 ? ' × ' . (int) $order['quantity'] : '' ?>
-                        </div>
-
-                        <div class="order-date">
-                            <?= date("F j, Y", strtotime($order['created_at'])) ?>
-                        </div>
-
-                        <div class="order-date">
-                            user id: <?= htmlspecialchars($order['user_id']) ?>
-                            <br>
-                            username: <?= htmlspecialchars($order['username']) ?>
-                        </div>
+        <?php $listedOrders = getOrderList($conn, $selectedUserId ?: null, $selectedStatus === 'all' ? null : $selectedStatus); ?>
+        <?php if (!$listedOrders): ?>
+            <p class="empty-orders">No orders found for the selected filters.</p>
+        <?php endif; ?>
+        <?php foreach ($listedOrders as $order): ?>
+            <?php $orderUrl = 'admin_orders.php?view=' . (int) $order['id']; ?>
+            <div class="order">
+                <?php if (!empty($order['has_image'])): ?>
+                    <img loading="lazy" src="image.php?id=<?= (int) $order['first_product_id'] ?>" alt="">
+                <?php else: ?>
+                    <img src="images/default.webp" alt="">
+                <?php endif; ?>
+                <div class="order-info">
+                    <div class="order-number">
+                        <a href="<?= $orderUrl ?>"><?= htmlspecialchars(orderTitle($order)) ?></a>
                     </div>
-
-                    <div class="order-status <?= $statusClass ?>">
-                        <?= htmlspecialchars($order['status']) ?>
+                    <div class="order-date"><?= date('F j, Y', strtotime($order['created_at'])) ?></div>
+                    <div class="order-date">
+                        user id: <?= (int) $order['user_id'] ?>
+                        <br>
+                        username: <?= htmlspecialchars($order['username']) ?>
                     </div>
-
-                    <form method="POST" class="status-form">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['admin_csrf_token']) ?>">
-                        <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                        <input type="hidden" name="return_status" value="<?= htmlspecialchars($activeStatus) ?>">
-                        <input type="hidden" name="return_user_id" value="<?= (int) $userId ?>">
-                        <select name="order_status" aria-label="Order status for order #<?= (int) $order['id'] ?>">
-                            <?php foreach (['processing', 'shipped', 'delivered', 'cancelled'] as $statusOption): ?>
-                                <option value="<?= $statusOption ?>" <?= $orderStatus === $statusOption ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars(ucfirst($statusOption)) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" name="update_order_status">Update</button>
-                    </form>
-
-                    <div class="order-price">
-                        ֏<?= number_format($order['price'] * $order['quantity'], 0) ?>
-                    </div>
-
-                    <div class="order-arrow">
-                        ›
-                    </div>
-
                 </div>
-                <?php
-            }
-        }
-        ?>
-        <?php showOrders($conn, $selectedStatus, $selectedUserId); ?>
+
+                <div class="order-status <?= orderStatusClass((string) $order['status']) ?>">
+                    <?= htmlspecialchars((string) $order['status']) ?>
+                </div>
+
+                <?php renderOrderStatusForm($order, $selectedStatus, $selectedUserId, 0); ?>
+
+                <div class="order-price">֏<?= number_format($order['total'], 0) ?></div>
+
+                <a class="order-arrow" href="<?= $orderUrl ?>" aria-label="Open order #<?= (int) $order['id'] ?>">›</a>
+            </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 
+    <?php if (!$viewOrder): ?>
     <script>
         const search = document.getElementById('customer-search');
         const options = document.getElementById('customer-options');
@@ -629,6 +727,7 @@ $statusCountStmt->close();
             if (!event.target.closest('.customer-filter')) options.classList.remove('open');
         });
     </script>
+    <?php endif; ?>
 
 </body>
 

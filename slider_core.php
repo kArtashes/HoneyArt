@@ -18,6 +18,10 @@ $images = glob($imageDir . '*.{jpg,jpeg,png,gif,webp}', GLOB_BRACE) ?: [];
         transition: transform 1s ease-in-out;
     }
 
+    .slider-wrapper picture {
+        display: contents;   /* the image itself stays the slide */
+    }
+
     .slider-wrapper img {
         flex: 0 0 100%;   /* each slide is exactly one slider wide */
         width: 100%;
@@ -44,13 +48,32 @@ $images = glob($imageDir . '*.{jpg,jpeg,png,gif,webp}', GLOB_BRACE) ?: [];
     .slider-container .next {
         right: 10px;
     }
+
+    /* Phones: the slide changes with a swipe, and the arrows would cover the banner text */
+    @media (max-width: 575px) {
+        .slider-container button.prev,
+        .slider-container button.next {
+            display: none;
+        }
+    }
 </style>
 <?php endif; ?>
 
 <div class="slider-container">
     <div class="slider-wrapper">
-        <?php foreach ($images as $image): ?>
-            <img src="<?php echo htmlspecialchars($image); ?>" alt="Slider Image" draggable="false">
+        <?php foreach ($images as $index => $image): ?>
+            <?php
+            // images/<folder>/small/ holds a lighter copy for phones
+            $phoneImage = dirname($image) . '/small/' . basename($image);
+            // The first slide loads right away; the script below loads the others when their turn comes
+            $loading = $index === 0 ? 'fetchpriority="high"' : 'loading="lazy"';
+            ?>
+            <picture>
+                <?php if (is_file(__DIR__ . '/' . $phoneImage)): ?>
+                    <source media="(max-width: 575px)" srcset="<?php echo htmlspecialchars($phoneImage); ?>">
+                <?php endif; ?>
+                <img src="<?php echo htmlspecialchars($image); ?>" alt="" draggable="false" <?php echo $loading; ?>>
+            </picture>
         <?php endforeach; ?>
     </div>
     <button class="prev" type="button" aria-label="Previous slide">❮</button>
@@ -60,7 +83,8 @@ $images = glob($imageDir . '*.{jpg,jpeg,png,gif,webp}', GLOB_BRACE) ?: [];
 <script>
     (function (container) {
         const wrapper = container.querySelector('.slider-wrapper');
-        const count = wrapper.children.length;
+        const slides = wrapper.querySelectorAll('img');
+        const count = slides.length;
         const prevButton = container.querySelector('.prev');
         const nextButton = container.querySelector('.next');
 
@@ -73,10 +97,17 @@ $images = glob($imageDir . '*.{jpg,jpeg,png,gif,webp}', GLOB_BRACE) ?: [];
         let currentIndex = 0;
         let timer = null;
 
+        // Start loading the slide that comes next, so it is ready when its turn comes
+        function prepareNextSlide() {
+            slides[(currentIndex + 1) % count].loading = 'eager';
+        }
+
         // Percent-based, so it stays correct when the window is resized or the phone is rotated
         function showSlide(index) {
             currentIndex = (index + count) % count;
+            slides[currentIndex].loading = 'eager';
             wrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
+            prepareNextSlide();
         }
 
         function restartAutoplay() {
@@ -101,5 +132,6 @@ $images = glob($imageDir . '*.{jpg,jpeg,png,gif,webp}', GLOB_BRACE) ?: [];
         });
 
         restartAutoplay();
+        window.addEventListener('load', prepareNextSlide);
     })(document.currentScript.previousElementSibling);
 </script>

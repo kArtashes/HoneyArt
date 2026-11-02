@@ -1,4 +1,11 @@
 <?php
+require_once __DIR__ . '/auth.php';
+// Already logged in: nothing to do here
+if (($_SESSION['loggedIn'] ?? false) === true) {
+    header('Location: account.php');
+    exit();
+}
+
 $pageTitle = 'Log In / Register';
 include("header.php");
 
@@ -7,11 +14,13 @@ $messages = [
     'invalid'          => ['error',   'login',    'Wrong email or password. Please try again.'],
     'too_many'         => ['error',   'login',    'Too many attempts. Please wait 15 minutes and try again.'],
     'login_required'   => ['error',   'login',    'Please log in to add products to your basket.'],
-    'register_invalid' => ['error',   'register', 'Please enter a name, a valid email and a password of at least 8 characters.'],
+    'register_invalid' => ['error',   'register', 'Please enter a name, a valid email and a password of 8 to 72 characters.'],
+    'register_failed'  => ['error',   'register', 'Sorry, we could not create your account. Please try again.'],
     'email_taken'      => ['error',   'register', 'This email is already registered. Try logging in instead.'],
     'account_deleted'  => ['success', 'login',    'Your account has been deleted.'],
+    'password_reset'   => ['success', 'login',    'Your password has been changed. You can log in now.'],
 ];
-$messageCode = $_GET['error'] ?? $_GET['notice'] ?? '';
+$messageCode = requestString($_GET, 'error') ?: requestString($_GET, 'notice');
 [$messageType, $activeForm, $messageText] = $messages[$messageCode] ?? [null, 'login', null];
 ?>
 <div id="login-reg-body">
@@ -39,17 +48,18 @@ $messageCode = $_GET['error'] ?? $_GET['notice'] ?? '';
                 </label>
                 
                 <button type="submit">Log In</button>
+                <a class="login-forgot" href="forgot_password.php">Forgot your password?</a>
             </form>
         </div>
 
 
         <div id="register" class="form-container">
             <form method="POST" action="register.php">
-                <input type="text"  id="register-username" name="username" placeholder="Username" required><br>
+                <input type="text"  id="register-username" name="username" placeholder="Username" maxlength="60" required><br>
 
-                <input type="email" id="register-email" name="email" placeholder="Email" required><br>
+                <input type="email" id="register-email" name="email" placeholder="Email" maxlength="255" required><br>
                     
-                <input type="password" id="register-password" name="password" placeholder="Password" required><br>
+                <input type="password" id="register-password" name="password" placeholder="Password" minlength="8" maxlength="72" required><br>
                     
                 <button type="submit">Register</button>
             </form>

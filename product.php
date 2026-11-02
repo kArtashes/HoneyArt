@@ -1,29 +1,29 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 
 
-// Database connection
-require_once __DIR__ . '/db.php';
 
 // Validate ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    echo "No product selected.";
-    exit;
+    $notFoundMessage = 'Product not found';
+    include __DIR__ . '/not_found.php';
 }
 
 $id = intval($_GET['id']);
 
 // Fetch main product info
-$stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, name, price, description, stock_quantity, is_hidden FROM products WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $product = $stmt->get_result()->fetch_assoc();
 
-if (!$product) {
-    echo "Product not found.";
-    exit;
+// A hidden product doesn't exist for customers; the admin can still open it
+$isHidden = $product && (int) $product['is_hidden'] === 1;
+$adminPreview = $isHidden && ($_SESSION['loggedin'] ?? false) === true;
+
+if (!$product || ($isHidden && !$adminPreview)) {
+    $notFoundMessage = 'Product not found';
+    include __DIR__ . '/not_found.php';
 }
 
 // Fetch additional images (exclude duplicates)
@@ -68,7 +68,7 @@ function addRecentlyViewed(mysqli $conn, int $userId, int $productId): bool
 $userId = (int) ($_SESSION['user_id'] ?? 0);
 $productId = (int) $product['id'];
 
-if ($userId > 0) {
+if ($userId > 0 && !$isHidden) {
     if(isRecentlyViewed($conn, $userId, $productId)){
         $sql = "
             UPDATE recently_viewed
@@ -106,10 +106,16 @@ if ($userId > 0) {
 
         <div id="price-add">
             <div class="price">֏<?php echo number_format($product['price'], 0); ?></div>
+            <?php if ($isHidden): ?>
+            <div class="out-of-stock" id="product-out-of-stock">Hidden from the shop</div>
+            <?php elseif ((int) $product['stock_quantity'] > 0): ?>
             <form method="POST" action="add_to_cart.php">
                 <input type="hidden" name="product_id" value="<?php echo (int) $product['id']; ?>">
                 <button type="submit" id="product-add">Add to basket</button>
             </form>
+            <?php else: ?>
+            <div class="out-of-stock" id="product-out-of-stock">Out of stock</div>
+            <?php endif; ?>
         </div>
         <div class="description"><?php echo nl2br(htmlspecialchars($product['description'] ?? '')); ?></div>
     </div>

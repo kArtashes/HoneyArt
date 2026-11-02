@@ -63,3 +63,8 @@
     text-align: left;
     padding: 0;
   }
+
+.item-unavailable {
+    color: #b42318;
+    font-size: 13px;
+}

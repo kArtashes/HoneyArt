@@ -4,21 +4,21 @@ require_once __DIR__ . '/db.php';
 
 // Validate ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    echo "No post selected.";
-    exit;
+    $notFoundMessage = 'Article not found';
+    include __DIR__ . '/not_found.php';
 }
 
 $id = intval($_GET['id']);
 
 // Fetch main product info
-$stmt = $conn->prepare("SELECT * FROM blog_posts WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, title, content FROM blog_posts WHERE id = ?");
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $post = $stmt->get_result()->fetch_assoc();
 
 if (!$post) {
-    echo "Post not found.";
-    exit;
+    $notFoundMessage = 'Article not found';
+    include __DIR__ . '/not_found.php';
 }
 
 

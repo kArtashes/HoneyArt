@@ -5,9 +5,9 @@ require_once __DIR__ . '/config.php';
 
 const ORDER_MAIL_MAX_ATTEMPTS = 3;
 
-// Sends one plain-text e-mail to the shop's inbox (notification_email in the mail config).
+// Sends one plain-text e-mail, by default to the shop's inbox (notification_email in the mail config).
 // Replies go to $replyEmail, so answering the e-mail answers the customer.
-function sendSiteMail(string $fromName, string $subject, string $body, string $replyEmail, string $replyName): bool
+function sendSiteMail(string $fromName, string $subject, string $body, string $replyEmail, string $replyName, ?string $to = null): bool
 {
     $mailConfigPath = PRIVATE_DIR . '/honeyart-mail.php';
     if (!is_readable($mailConfigPath)) {
@@ -41,7 +41,7 @@ function sendSiteMail(string $fromName, string $subject, string $body, string $r
         $mail->Timeout = 15;
         $mail->CharSet = 'UTF-8';
         $mail->setFrom($smtpUsername, $fromName);
-        $mail->addAddress($notificationEmail);
+        $mail->addAddress($to ?? $notificationEmail);
         $mail->addReplyTo($replyEmail, $replyName);
         $mail->isHTML(false);
         $mail->Subject = $subject;
@@ -55,7 +55,7 @@ function sendSiteMail(string $fromName, string $subject, string $body, string $r
     }
 }
 
-function sendOrderNotification(array $user, array $address, array $items, float $total): bool
+function sendOrderNotification(array $user, array $address, array $items, float $total, ?int $orderId = null): bool
 {
     $lines = [];
     foreach ($items as $item) {
@@ -75,7 +75,9 @@ function sendOrderNotification(array $user, array $address, array $items, float 
         . "\n\nItems:\n" . implode("\n", $lines)
         . "\n\nTotal: ֏" . number_format($total, 0);
 
-    return sendSiteMail('HoneyArt Orders', 'New HoneyArt order from ' . $user['username'], $body, $user['email'], $user['username']);
+    $subject = 'New HoneyArt order' . ($orderId ? ' #' . $orderId : '') . ' from ' . $user['username'];
+
+    return sendSiteMail('HoneyArt Orders', $subject, $body, $user['email'], $user['username']);
 }
 
 function sendSupportMessage(string $name, string $email, string $message): bool
@@ -85,15 +87,27 @@ function sendSupportMessage(string $name, string $email, string $message): bool
     return sendSiteMail('HoneyArt Support', $name . ' needs support', $body, $email, $name);
 }
 
+function sendPasswordResetEmail(string $username, string $email, string $resetUrl): bool
+{
+    $body = "Hello $username,\n\n"
+        . "Someone asked to reset the password of your HoneyArt account.\n"
+        . "Open this link to choose a new password (it works for 1 hour):\n\n"
+        . "$resetUrl\n\n"
+        . "If this wasn't you, ignore this e-mail. Your password stays the same.";
+
+    return sendSiteMail('HoneyArt', 'Reset your HoneyArt password', $body, $email, $username, $email);
+}
+
 // Saves the e-mail to the queue. Call it inside the order transaction,
 // so the order and its e-mail are saved together or not at all.
-function queueOrderNotification(mysqli $conn, array $user, array $address, array $items, float $total): void
+function queueOrderNotification(mysqli $conn, array $user, array $address, array $items, float $total, int $orderId): void
 {
     $payload = json_encode([
         'user' => $user,
         'address' => $address,
         'items' => $items,
         'total' => $total,
+        'order_id' => $orderId,
     ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
     $stmt = $conn->prepare('INSERT INTO order_notifications (payload) VALUES (?)');
@@ -118,9 +132,33 @@ function queueSupportMessage(mysqli $conn, string $name, string $email, string $
     $stmt->close();
 }
 
+// Queued as well, so the page answers just as fast for an unknown e-mail
+// and the response time doesn't reveal who has an account.
+function queuePasswordResetEmail(mysqli $conn, string $username, string $email, string $resetUrl): void
+{
+    $payload = json_encode([
+        'type' => 'password_reset',
+        'username' => $username,
+        'email' => $email,
+        'url' => $resetUrl,
+    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+    $stmt = $conn->prepare('INSERT INTO order_notifications (payload) VALUES (?)');
+    $stmt->bind_param('s', $payload);
+    $stmt->execute();
+    $stmt->close();
+}
+
 // Sends up to $limit queued e-mails. Returns how many were sent.
 function processOrderNotifications(mysqli $conn, int $limit = 5): int
 {
+    // Sent e-mails hold customers' addresses; no reason to keep them for long
+    $conn->query("DELETE FROM order_notifications WHERE status = 'sent' AND sent_at < NOW() - INTERVAL 90 DAY");
+    // A reset link is useless after 1 hour, whether it could be sent or not
+    $conn->query("DELETE FROM order_notifications
+                  WHERE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.type')) = 'password_reset'
+                    AND created_at < NOW() - INTERVAL 1 HOUR");
+
     // 'sending' rows older than 10 minutes belong to a request that died mid-send
     $stmt = $conn->prepare(
         "SELECT id FROM order_notifications
@@ -158,11 +196,20 @@ function processOrderNotifications(mysqli $conn, int $limit = 5): int
         $row = $conn->query("SELECT payload, attempts FROM order_notifications WHERE id = $id")->fetch_assoc();
         $data = json_decode($row['payload'], true);
 
-        $sentOk = ($data['type'] ?? 'order') === 'support'
-            ? sendSupportMessage($data['name'], $data['email'], $data['message'])
-            : sendOrderNotification($data['user'], $data['address'], $data['items'], (float) $data['total']);
+        $type = $data['type'] ?? 'order';
+        if ($type === 'support') {
+            $sentOk = sendSupportMessage($data['name'], $data['email'], $data['message']);
+        } elseif ($type === 'password_reset') {
+            $sentOk = sendPasswordResetEmail($data['username'], $data['email'], $data['url']);
+        } else {
+            $sentOk = sendOrderNotification($data['user'], $data['address'], $data['items'], (float) $data['total'], $data['order_id'] ?? null);
+        }
 
-        if ($sentOk) {
+        if ($sentOk && $type === 'password_reset') {
+            // The link inside is a key to the account: don't keep it once it has been sent
+            $conn->query("DELETE FROM order_notifications WHERE id = $id");
+            $sent++;
+        } elseif ($sentOk) {
             $conn->query("UPDATE order_notifications SET status = 'sent', sent_at = NOW() WHERE id = $id");
             $sent++;
         } else {

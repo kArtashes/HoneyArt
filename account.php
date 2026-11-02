@@ -1,28 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-require_once __DIR__ . '/db.php';
-
-// 🔹 Restore session from remember me cookie if not logged in
-if (!isset($_SESSION['loggedIn']) && isset($_COOKIE['remember_token'])) {
-  $token = $_COOKIE['remember_token'];
-
-  $stmt = $conn->prepare("SELECT * FROM users WHERE remember_expiry > NOW()");
-  $stmt->execute();
-  $result = $stmt->get_result();
-
-  while ($row = $result->fetch_assoc()) {
-    if (password_verify($token, $row['remember_token'])) {
-      // restore session
-      session_regenerate_id(true);
-      $_SESSION['loggedIn'] = true;
-      $_SESSION['user_id'] = $row['id'];
-      $_SESSION['email'] = $row['email'];
-      break;
-    }
-  }
-}
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/login_limiter.php';
+require_once __DIR__ . '/orders_lib.php';
 
 // 🔹 Redirect to login if still not logged in
 if (!isset($_SESSION['loggedIn']) || $_SESSION['loggedIn'] !== true) {
@@ -36,6 +15,16 @@ if (empty($_SESSION['csrf_token'])) {
 
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $activeSection = 'dashboard';
+$settingsTab = 'settings-profile';
+
+// account.php?section=password opens Account Settings on the Password tab, ?section=orders the orders
+$requestedSection = requestString($_GET, 'section');
+if ($requestedSection === 'password') {
+  $activeSection = 'accountSettings';
+  $settingsTab = 'settings-password';
+} elseif ($requestedSection === 'orders') {
+  $activeSection = 'orders';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
   if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
@@ -62,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
 
     session_unset();
     session_destroy();
-    setcookie('remember_token', '', time() - 3600, '/');
+    clearRememberCookie();
 
     header('Location: logInReg.php?notice=account_deleted');
     exit();
@@ -75,6 +64,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
   }
 }
 
+function emailUsedByAnotherUser(mysqli $conn, string $email, int $userId): bool
+{
+  $stmt = $conn->prepare('SELECT 1 FROM users WHERE email = ? AND id <> ?');
+  $stmt->bind_param('si', $email, $userId);
+  $stmt->execute();
+  $taken = $stmt->get_result()->num_rows > 0;
+  $stmt->close();
+
+  return $taken;
+}
+
 // Process profile updates before any HTML is sent, so redirects can set headers.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
   $username = trim($_POST['username'] ?? '');
@@ -84,10 +84,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
     $_SESSION['flash_message'] = 'Invalid request. Please try again.';
     $_SESSION['flash_type'] = 'error';
   } elseif ($username === '' || $email === '') {
-    $_SESSION['flash_message'] = 'Username և Email պարտադիր են։';
+    $_SESSION['flash_message'] = 'Name and email are required.';
     $_SESSION['flash_type'] = 'error';
   } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['flash_message'] = "Email-ի ֆորմատը սխալ է։";
+    $_SESSION['flash_message'] = 'Please enter a valid email address.';
+    $_SESSION['flash_type'] = 'error';
+  } elseif (mb_strlen($username) > 60 || mb_strlen($email) > 255) {
+    $_SESSION['flash_message'] = 'Name can be up to 60 characters and email up to 255.';
+    $_SESSION['flash_type'] = 'error';
+  } elseif (emailUsedByAnotherUser($conn, $email, $user_id)) {
+    $_SESSION['flash_message'] = 'This email is already used by another account.';
     $_SESSION['flash_type'] = 'error';
   } elseif ($user_id) {
     $updateStmt = $conn->prepare(
@@ -101,7 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
       $_SESSION['flash_message'] = 'Profile updated successfully.';
       $_SESSION['flash_type'] = 'success';
     } catch (mysqli_sql_exception $e) {
-      $_SESSION['flash_message'] = 'Error: ' . $e->getMessage();
+      error_log('HoneyArt profile update failed: ' . $e->getMessage());
+      $_SESSION['flash_message'] = $e->getCode() === 1062
+        ? 'This email is already used by another account.'
+        : 'Could not save your profile. Please try again.';
       $_SESSION['flash_type'] = 'error';
     } finally {
       $updateStmt->close();
@@ -109,6 +118,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
   }
 
   header('Location: account.php');
+  exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+  $currentPassword = requestString($_POST, 'current_password', false);
+  $newPassword = requestString($_POST, 'new_password', false);
+  $confirmPassword = requestString($_POST, 'new_password_confirm', false);
+  $attemptKey = (string) $user_id;
+
+  $stmt = $conn->prepare('SELECT id, email, password FROM users WHERE id = ?');
+  $stmt->bind_param('i', $user_id);
+  $stmt->execute();
+  $account = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+
+  $_SESSION['flash_type'] = 'error';
+
+  if (!hash_equals($_SESSION['csrf_token'], requestString($_POST, 'csrf_token'))) {
+    $_SESSION['flash_message'] = 'Invalid request. Please try again.';
+  } elseif (tooManyLoginAttempts($conn, 'password_change', $attemptKey)) {
+    $_SESSION['flash_message'] = 'Too many attempts. Please wait 15 minutes and try again.';
+  } elseif (!password_verify($currentPassword, $account['password'])) {
+    recordFailedLogin($conn, 'password_change', $attemptKey);
+    $_SESSION['flash_message'] = 'Your current password is not correct.';
+  } elseif (!passwordLengthOk($newPassword)) {
+    $_SESSION['flash_message'] = 'The new password must be ' . PASSWORD_MIN_LENGTH . ' to ' . PASSWORD_MAX_LENGTH . ' characters long.';
+  } elseif ($newPassword !== $confirmPassword) {
+    $_SESSION['flash_message'] = 'The two new passwords do not match.';
+  } else {
+    $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    $stmt = $conn->prepare('UPDATE users SET password = ? WHERE id = ?');
+    $stmt->bind_param('si', $newHash, $user_id);
+    $stmt->execute();
+    $stmt->close();
+
+    clearFailedLogins($conn, 'password_change', $attemptKey);
+
+    // Other devices are logged out; this one stays logged in (and remembered, if it was)
+    $wasRemembered = isset($_COOKIE[REMEMBER_COOKIE]);
+    forgetCustomer($conn, $user_id);
+    logInCustomer(['id' => $user_id, 'email' => $account['email'], 'password' => $newHash]);
+    if ($wasRemembered) {
+      rememberCustomer($conn, $user_id);
+    }
+
+    $_SESSION['flash_message'] = 'Your password has been changed.';
+    $_SESSION['flash_type'] = 'success';
+  }
+
+  header('Location: account.php?section=password');
   exit();
 }
 
@@ -292,10 +351,10 @@ if ($editingAddressId) {
         $userId = $userinfo['id'];
 
         $sql = "
-                      SELECT p.*
+                      SELECT p.id, p.name, p.weight_kg, p.price, (p.image_data IS NOT NULL) AS has_image
                       FROM products p
                       JOIN recently_viewed rv ON p.id = rv.product_id
-                      WHERE rv.user_id = ?
+                      WHERE rv.user_id = ? AND p.is_hidden = 0
                       ORDER BY rv.viewed_at DESC
                       LIMIT 5
                       ";
@@ -308,9 +367,9 @@ if ($editingAddressId) {
         ?>
         <?php if ($result->num_rows > 0): ?>
           <?php while ($row = $result->fetch_assoc()): ?>
-            <div class="viewedProduct" onclick="window.location.href='product.php?id=<?php echo (int) $row['id']; ?>'">
-              <?php if (!empty($row["image_data"])): ?>
-                <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
+            <div class="viewedProduct">
+              <?php if (!empty($row["has_image"])): ?>
+                <img loading="lazy" src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
               <?php else: ?>
                 <img src="images/default.webp" alt="No Image">
               <?php endif; ?>
@@ -324,7 +383,7 @@ if ($editingAddressId) {
                 // Float → 1 decimal
                 $formatted = number_format($weight, 1);
               } ?>
-              <h2><?php echo htmlspecialchars($row['name']) . " " . $formatted . " kg" ?></h2>
+              <h2><a class="card-link" href="product.php?id=<?php echo (int) $row['id']; ?>"><?php echo htmlspecialchars($row['name']) . " " . $formatted . " kg" ?></a></h2>
               <div class="price">֏<?php echo number_format($row['price'], 0); ?></div>
             </div>
           <?php endwhile; ?>
@@ -339,91 +398,13 @@ if ($editingAddressId) {
         <button onclick="openSection('.orders')">View All Orders</button>
       </div>
       <div id="dash-orders-cont">
-        <?php
-        $sql = "SELECT 
-                    orders.id,
-                    orders.user_id,
-                    orders.product_id,
-                    orders.quantity,
-                    orders.status,
-                    orders.created_at,
-                    products.name,
-                    orders.unit_price AS price,
-                    products.`image_data`, 
-                    products.`image_type`
-                FROM orders
-                JOIN products ON orders.product_id = products.id
-                WHERE orders.user_id = ?
-                ORDER BY orders.created_at DESC
-                LIMIT 3";
-
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        while ($order = $result->fetch_assoc()): ?>
-
-          <?php
-          $status = strtolower($order['status']);
-
-          switch ($status) {
-            case 'delivered':
-              $statusClass = 'status-delivered';
-              break;
-
-            case 'shipped':
-              $statusClass = 'status-shipped';
-              break;
-
-            case 'processing':
-              $statusClass = 'status-processing';
-              break;
-
-            case 'cancelled':
-              $statusClass = 'status-cancelled';
-              break;
-
-            default:
-              $statusClass = 'status-pending';
-          }
-          ?>
-
-          <div class="order">
-            <?php
-            if (!empty($order["image_data"])): ?>
-              <img src="image.php?id=<?php echo $order['product_id']; ?>"
-                alt="<?php echo htmlspecialchars($order['name']); ?>">
-            <?php else: ?>
-              <img src="images/default.webp" alt="No Image">
-            <?php endif; ?>
-            <div class="order-info">
-              <div class="order-number">
-                #<?= htmlspecialchars($order['id']) ?>
-                - <?= htmlspecialchars($order['name']) ?><?= (int) $order['quantity'] > 1 ? ' × ' . (int) $order['quantity'] : '' ?>
-              </div>
-
-              <div class="order-date">
-                <?= date("F j, Y", strtotime($order['created_at'])) ?>
-              </div>
-            </div>
-
-            <div class="order-status <?= $statusClass ?>">
-              <?= htmlspecialchars($order['status']) ?>
-            </div>
-
-            <div class="order-price">
-              ֏<?= number_format($order['price'] * $order['quantity'], 0) ?>
-            </div>
-
-            <div class="order-arrow">
-              ›
-            </div>
-
-          </div>
-
-        <?php endwhile; ?>
+        <?php $customerOrders = getOrderList($conn, $user_id); ?>
+        <?php foreach (array_slice($customerOrders, 0, 3) as $order) {
+          renderCustomerOrderRow($order);
+        } ?>
+        <?php if (!$customerOrders): ?>
+          <p class="no-orders">You have no orders yet.</p>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -557,124 +538,19 @@ if ($editingAddressId) {
       <li onclick="openOrderSection('.delivered', this)">Delivered</li>
       <li onclick="openOrderSection('.cancelled', this)">Cancelled</li>
     </ul>
-    <?php
-      function showOrders($conn, $user_id, $status = null) {
-
-        $sql = "SELECT 
-                    orders.id,
-                    orders.user_id,
-                    orders.product_id,
-                    orders.quantity,
-                    orders.status,
-                    orders.created_at,
-                    products.name,
-                    orders.unit_price AS price,
-                    products.image_data,
-                    products.image_type
-                FROM orders
-                JOIN products ON orders.product_id = products.id
-                WHERE orders.user_id = ?";
-    
-        if ($status !== null) {
-            $sql .= " AND orders.status = ?";
-        }
-    
-        $sql .= " ORDER BY orders.created_at DESC";
-    
-        $stmt = $conn->prepare($sql);
-    
-        if ($status === null) {
-            $stmt->bind_param("i", $user_id);
-        } else {
-            $stmt->bind_param("is", $user_id, $status);
-        }
-    
-        $stmt->execute();
-    
-        $result = $stmt->get_result();
-    
-        while ($order = $result->fetch_assoc()) {
-
-          
-          $status = strtolower($order['status']);
-
-          switch ($status) {
-            case 'delivered':
-              $statusClass = 'status-delivered';
-              break;
-
-            case 'shipped':
-              $statusClass = 'status-shipped';
-              break;
-
-            case 'processing':
-              $statusClass = 'status-processing';
-              break;
-
-            case 'cancelled':
-              $statusClass = 'status-cancelled';
-              break;
-
-            default:
-              $statusClass = 'status-pending';
-          }
-          
-          ?>
-            <div class="order">
-            <?php
-            if (!empty($order["image_data"])): ?>
-              <img src="image.php?id=<?php echo $order['product_id']; ?>"
-                alt="<?php echo htmlspecialchars($order['name']); ?>">
-            <?php else: ?>
-              <img src="images/default.webp" alt="No Image">
-            <?php endif; ?>
-            <div class="order-info">
-              <div class="order-number">
-                #<?= htmlspecialchars($order['id']) ?>
-                - <?= htmlspecialchars($order['name']) ?><?= (int) $order['quantity'] > 1 ? ' × ' . (int) $order['quantity'] : '' ?>
-              </div>
-
-              <div class="order-date">
-                <?= date("F j, Y", strtotime($order['created_at'])) ?>
-              </div>
-            </div>
-
-            <div class="order-status <?= $statusClass ?>">
-              <?= htmlspecialchars($order['status']) ?>
-            </div>
-
-            <div class="order-price">
-              ֏<?= number_format($order['price'] * $order['quantity'], 0) ?>
-            </div>
-
-            <div class="order-arrow">
-              ›
-            </div>
-
-          </div>
-          <?php
-        }
-      }
-    ?>
-    <div class="all">
-    <?php showOrders($conn, $user_id); ?>
-</div>
-
-<div class="processing">
-    <?php showOrders($conn, $user_id, 'processing'); ?>
-</div>
-
-<div class="shipped">
-    <?php showOrders($conn, $user_id, 'shipped'); ?>
-</div>
-
-<div class="delivered">
-    <?php showOrders($conn, $user_id, 'delivered'); ?>
-</div>
-
-<div class="cancelled">
-    <?php showOrders($conn, $user_id, 'cancelled'); ?>
-</div>
+    <?php foreach (['all', 'processing', 'shipped', 'delivered', 'cancelled'] as $section): ?>
+      <?php
+      $sectionOrders = array_filter($customerOrders, fn(array $order): bool => $section === 'all' || strtolower($order['status']) === $section);
+      ?>
+      <div class="<?php echo $section; ?>">
+        <?php foreach ($sectionOrders as $order) {
+          renderCustomerOrderRow($order);
+        } ?>
+        <?php if (!$sectionOrders): ?>
+          <p class="no-orders">No orders here.</p>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
   </div>
   <!-- ============================wishlist=================================== -->
   <div class="wishlist">
@@ -683,10 +559,10 @@ if ($editingAddressId) {
     $user_id = $_SESSION['user_id'] ?? 0;
 
     $stmt = $conn->prepare("
-        SELECT p.*
+        SELECT p.id, p.name, p.weight_kg, p.price, p.stock_quantity, (p.image_data IS NOT NULL) AS has_image
         FROM wishlist w
         JOIN products p ON w.product_id = p.id
-        WHERE w.user_id = ?
+        WHERE w.user_id = ? AND p.is_hidden = 0
         ORDER BY w.created_at DESC; 
     ");
 
@@ -698,7 +574,7 @@ if ($editingAddressId) {
     <div id="products">
             <?php if ($result->num_rows > 0): ?>
                 <?php while ($row = $result->fetch_assoc()): ?>
-                    <div class="product" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
+                    <div class="product">
                     <button 
                         type="button" 
                         class="wishlist-btn active"
@@ -707,8 +583,8 @@ if ($editingAddressId) {
                         ♥
                     </button>
                         <?php
-                        if (!empty($row["image_data"])): ?>
-                            <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
+                        if (!empty($row["has_image"])): ?>
+                            <img loading="lazy" src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                         <?php else: ?>
                             <img src="images/default.webp" alt="No Image">
                         <?php endif; ?>
@@ -722,12 +598,16 @@ if ($editingAddressId) {
                             // Float → 1 decimal
                             $formatted = number_format($weight, 1);
                         }?>
-                        <h2><?php echo htmlspecialchars($row['name']) ." ". $formatted . " kg" ?></h2>
+                        <h2><a class="card-link" href="product.php?id=<?php echo (int) $row['id']; ?>"><?php echo htmlspecialchars($row['name']) ." ". $formatted . " kg" ?></a></h2>
                         <div class="price">֏<?php echo number_format($row['price'], 0); ?></div>
+                        <?php if ((int) $row['stock_quantity'] > 0): ?>
                         <form method="POST" action="add_to_cart.php">
                             <input type="hidden" name="product_id" value="<?php echo $row['id'] ?>">
                             <button type="submit">Quick add</button>
                         </form>
+                        <?php else: ?>
+                        <div class="out-of-stock">Out of stock</div>
+                        <?php endif; ?>
                     </div>
                 <?php endwhile; ?>
             <?php else: ?>
@@ -879,7 +759,7 @@ if ($editingAddressId) {
     }
 
     // 1) Profile-ի տվյալները users աղյուսակից
-    $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT username, email, created_at FROM users WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc(); // ասոցիատիվ array՝ մեկ տող
@@ -887,7 +767,7 @@ if ($editingAddressId) {
 
     // Account Summary-ի համար
     $stmt2 = $conn->prepare("
-        SELECT COUNT(*) AS total_orders, SUM(CASE WHEN status <> 'cancelled' THEN unit_price * quantity ELSE 0 END) AS total_spent FROM orders WHERE user_id = ?
+        SELECT COUNT(*) AS total_orders, SUM(CASE WHEN status <> 'cancelled' THEN total ELSE 0 END) AS total_spent FROM orders WHERE user_id = ?
     ");
     $stmt2->bind_param("i", $user_id);
     $stmt2->execute();
@@ -895,29 +775,34 @@ if ($editingAddressId) {
     $stmt2->close();
     ?>
 
+    <?php if ($message !== ''): ?>
+      <p class="account-flash <?php echo htmlspecialchars($messageType); ?>"><?php echo htmlspecialchars($message); ?></p>
+    <?php endif; ?>
+
     <div class="tabs">
-      <span>Profile</span><span>Password</span>
+      <button type="button" data-panel="settings-profile" onclick="openSettingsTab('settings-profile')">Profile</button>
+      <button type="button" data-panel="settings-password" onclick="openSettingsTab('settings-password')">Password</button>
     </div>
+
+    <div id="settings-profile" class="settings-panel">
     <div class="grid">
       <section class="card">
         <h2>Profile Information</h2>
         <form method="POST" action="">
           <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
           <label>Full Name
-            <input name="username" value="<?php echo htmlspecialchars($user['username'] ?? ''); ?>">
+            <input name="username" maxlength="60" required value="<?php echo htmlspecialchars($user['username'] ?? ''); ?>">
           </label>
           <label>Email
-            <input name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>">
+            <input type="email" name="email" maxlength="255" required value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>">
           </label>
           <button type="submit" name="save_profile">Save Changes</button>
         </form>
       </section>
       <section class="card">
-        <h2>Profile Picture</h2>
+        <h2>Account Summary</h2>
         <div class="bigavatar">👤</div>
-        <button>Upload Photo</button>
-        <h3>Account Summary</h3>
-        <p>Member Since: <?php echo htmlspecialchars($user['member_since'] ?? '2026'); ?></p>
+        <p>Member Since: <?php echo date('F Y', strtotime($user['created_at'])); ?></p>
         <p>Total Orders: <?php echo (int)($summary['total_orders'] ?? 0); ?></p>
         <p>Total Spent: ֏<?php echo number_format($summary['total_spent'] ?? 0, 0); ?></p>
       </section>
@@ -930,6 +815,39 @@ if ($editingAddressId) {
         <button type="submit" name="delete_account" class="dangerbtn">Delete My Account</button>
       </form>
     </section>
+    </div>
+
+    <div id="settings-password" class="settings-panel">
+      <section class="card password-card">
+        <h2>Change Password</h2>
+        <form method="POST" action="account.php">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+          <label>Current password
+            <input type="password" name="current_password" autocomplete="current-password" required>
+          </label>
+          <label>New password (<?php echo PASSWORD_MIN_LENGTH; ?> to <?php echo PASSWORD_MAX_LENGTH; ?> characters)
+            <input type="password" name="new_password" minlength="<?php echo PASSWORD_MIN_LENGTH; ?>" maxlength="<?php echo PASSWORD_MAX_LENGTH; ?>" autocomplete="new-password" required>
+          </label>
+          <label>Repeat the new password
+            <input type="password" name="new_password_confirm" minlength="<?php echo PASSWORD_MIN_LENGTH; ?>" maxlength="<?php echo PASSWORD_MAX_LENGTH; ?>" autocomplete="new-password" required>
+          </label>
+          <button type="submit" name="change_password">Change Password</button>
+        </form>
+        <p class="password-forgot">Don't remember your current password? <a href="forgot_password.php">Get a reset link by email</a></p>
+      </section>
+    </div>
+
+    <script>
+      function openSettingsTab(panelId) {
+        document.querySelectorAll('.settings-panel').forEach(panel => {
+          panel.hidden = panel.id !== panelId;
+        });
+        document.querySelectorAll('.tabs button').forEach(button => {
+          button.classList.toggle('active', button.dataset.panel === panelId);
+        });
+      }
+      openSettingsTab('<?php echo $settingsTab; ?>');
+    </script>
   </div>
 </div>
 

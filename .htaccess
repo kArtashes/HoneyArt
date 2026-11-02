@@ -1,0 +1,41 @@
+# Directory listings off
+Options -Indexes
+
+# Never serve these over the web: hidden files, the .git folder, SQL and notes
+RedirectMatch 404 "/\.git(/|$)"
+<FilesMatch "^\.|\.(sql|md|bak|log)$">
+    Require all denied
+</FilesMatch>
+
+# Files that are only included by other PHP files, never opened directly
+<FilesMatch "^(auth|db|config|asset|orders_lib|image_utils|order_mail|login_limiter|admin_auth|admin_set_password|cart|footer|header|not_found|search_form|slider|slider_core|slider_home)\.php$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    # Security headers
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always unset X-Powered-By
+
+    # Browser caching. CSS links carry ?v=<file time> (asset.php), so they can be cached for long
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(webp|png|jpe?g|gif|svg|ico)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+</IfModule>
+
+# Compress text responses (when the server has mod_deflate)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Session cookie settings when PHP runs as an Apache module (under FastCGI: see .user.ini)
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly on
+    php_flag session.use_strict_mode on
+    php_value session.cookie_samesite Lax
+</IfModule>

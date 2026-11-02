@@ -1,11 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json');
 
-// Database connection
-require_once __DIR__ . '/db.php';
 
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 if (!$user_id) {
@@ -28,8 +24,21 @@ function cartQuery(mysqli $conn, string $sql, int ...$params): ?mysqli_result
     return $result ?: null;
 }
 
+$stockLimit = false;
+
 if ($action === 'increase') {
-    cartQuery($conn, "UPDATE cart SET quantity = quantity + 1 WHERE user_id = ? AND product_id = ?", $user_id, $product_id);
+    $row = cartQuery($conn, "
+        SELECT cart.quantity, products.stock_quantity, products.is_hidden
+        FROM cart
+        INNER JOIN products ON cart.product_id = products.id
+        WHERE cart.user_id = ? AND cart.product_id = ?
+    ", $user_id, $product_id)->fetch_assoc();
+
+    if ($row && ((int) $row['is_hidden'] === 1 || (int) $row['quantity'] >= (int) $row['stock_quantity'])) {
+        $stockLimit = true;
+    } else {
+        cartQuery($conn, "UPDATE cart SET quantity = quantity + 1 WHERE user_id = ? AND product_id = ?", $user_id, $product_id);
+    }
 } elseif ($action === 'decrease') {
     cartQuery($conn, "UPDATE cart SET quantity = quantity - 1 WHERE user_id = ? AND product_id = ?", $user_id, $product_id);
     cartQuery($conn, "DELETE FROM cart WHERE user_id = ? AND product_id = ? AND quantity <= 0", $user_id, $product_id);
@@ -58,6 +67,7 @@ $total_price = (int) ($row['total_price'] ?? 0);
 echo json_encode([
     'quantity'    => $quantity,
     'cart_count'  => $cart_count,
-    'total_price' => $total_price
+    'total_price' => $total_price,
+    'stock_limit' => $stockLimit
 ]);
 exit;

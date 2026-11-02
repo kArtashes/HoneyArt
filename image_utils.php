@@ -15,6 +15,19 @@ function toWebp(string $imageData, int $maxWidth): ?string
         return null;
     }
 
+    // Phone photos are stored sideways with a "rotate me" note (EXIF); apply it, because WebP drops the note
+    if (function_exists('exif_read_data') && strncmp($imageData, "\xFF\xD8", 2) === 0) {
+        $stream = fopen('php://memory', 'r+');
+        fwrite($stream, $imageData);
+        rewind($stream);
+        $exif = @exif_read_data($stream);
+        fclose($stream);
+        $angle = [3 => 180, 6 => 270, 8 => 90][$exif['Orientation'] ?? 1] ?? 0;
+        if ($angle !== 0) {
+            $image = imagerotate($image, $angle, 0);
+        }
+    }
+
     // Keep transparency (PNG logos, cut-out jars)
     imagepalettetotruecolor($image);
     imagealphablending($image, false);

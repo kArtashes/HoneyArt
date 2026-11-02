@@ -11,8 +11,8 @@ if (($_SESSION["loggedin"] ?? false) === true) {
 
 // Check submitted login form
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = (string) ($_POST["username"] ?? '');
-    $password = (string) ($_POST["password"] ?? '');
+    $username = requestString($_POST, 'username');
+    $password = requestString($_POST, 'password', false);
 
     if (tooManyLoginAttempts($conn, 'admin', $username)) {
         $error = "Too many attempts. Please wait 15 minutes and try again.";
@@ -34,6 +34,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
     <title>Admin Login</title>
     <style>
         body {

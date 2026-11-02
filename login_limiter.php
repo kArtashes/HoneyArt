@@ -34,7 +34,8 @@ function tooManyLoginAttempts(mysqli $conn, string $scope, string $identifier): 
         || (int) $counts['ip_fails'] >= LOGIN_MAX_FAILS_PER_IP;
 }
 
-function recordFailedLogin(mysqli $conn, string $scope, string $identifier): void
+// Counts one attempt without slowing the visitor down (support form, registration)
+function recordAttempt(mysqli $conn, string $scope, string $identifier): void
 {
     $identifier = mb_strtolower(trim($identifier));
     $ip = loginClientIp();
@@ -46,7 +47,11 @@ function recordFailedLogin(mysqli $conn, string $scope, string $identifier): voi
 
     // Old rows are no longer needed
     $conn->query('DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL 1 DAY');
+}
 
+function recordFailedLogin(mysqli $conn, string $scope, string $identifier): void
+{
+    recordAttempt($conn, $scope, $identifier);
     sleep(1); // every wrong guess costs the guesser a second
 }
 

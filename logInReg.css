@@ -109,3 +109,70 @@
 }
 .login-message.error   { background: #fde7e7; color: #b42318; }
 .login-message.success { background: #e6f4ea; color: #217a3c; }
+
+.login-forgot {
+    display: block;
+    width: 200px;
+    margin-top: 10px;
+    color: #b87d00;
+    font-size: 14px;
+    text-align: center;
+}
+
+/* Forgot / reset password pages */
+.auth-page {
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px 64px;
+}
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 28px 24px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.auth-card h1 {
+    margin: 0 0 12px;
+    font-size: 26px;
+}
+.auth-card p {
+    line-height: 1.5;
+}
+.auth-card .login-message {
+    max-width: none;
+}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 16px 0;
+}
+.auth-form label {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #444;
+}
+.auth-form input:not([type="hidden"]) {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;   /* 16px+ stops iPhone from zooming in */
+}
+.auth-form button {
+    margin-top: 12px;
+    padding: 13px 16px;
+    border: none;
+    border-radius: 10px;
+    background: #F9A825;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.auth-link {
+    color: #b87d00;
+    font-size: 15px;
+}

@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 header("Content-Type: application/json");
 
 if (!isset($_SESSION['user_id'])) {
@@ -13,19 +11,21 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
-$product_id = $_POST['product_id'] ?? null;
 
-if (!$product_id) {
+$user_id = (int) $_SESSION['user_id'];
+$product_id = (int) requestString($_POST, 'product_id');
+
+$stmt = $conn->prepare('SELECT 1 FROM products WHERE id = ? AND is_hidden = 0');
+$stmt->bind_param('i', $product_id);
+$stmt->execute();
+
+if ($stmt->get_result()->num_rows === 0) {
     echo json_encode([
         "success" => false,
         "message" => "Invalid product."
     ]);
     exit;
 }
-
-
-require_once __DIR__ . '/db.php';
 
 $stmt = $conn->prepare(
     "SELECT id FROM wishlist 

@@ -1,25 +1,22 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 
-require_once __DIR__ . '/db.php';
 
 $user_id = $_SESSION['user_id'] ?? 0;
 
 // ?q=... comes from the search bar (Enter / "See all results")
-$searchQuery = trim((string) ($_GET['q'] ?? ''));
+$searchQuery = requestString($_GET, 'q');
 $searchLike = '%' . addcslashes($searchQuery, '%_\\') . '%';
 
 $stmt = $conn->prepare("
     SELECT 
-        p.*,
+        p.id, p.name, p.price, p.weight_kg, p.stock_quantity, (p.image_data IS NOT NULL) AS has_image,
         w.id AS wishlist_id
     FROM products p
     LEFT JOIN wishlist w 
         ON p.id = w.product_id
         AND w.user_id = ?
-    WHERE ? = '' OR p.name LIKE ? OR p.category LIKE ?
+    WHERE p.is_hidden = 0 AND (? = '' OR p.name LIKE ? OR p.category LIKE ?)
     ORDER BY p.created_at DESC
 ");
 
@@ -53,7 +50,7 @@ include('header.php'); ?>
 <div id="products">
         <?php if ($result->num_rows > 0): ?>
             <?php while ($row = $result->fetch_assoc()): ?>
-                <div class="product" onclick="window.location.href='product.php?id=<?php echo $row['id']; ?>'">
+                <div class="product">
                 <button 
                     type="button" 
                     class="wishlist-btn <?= $row['wishlist_id'] ? 'active' : '' ?>"
@@ -62,8 +59,8 @@ include('header.php'); ?>
                     <?= $row['wishlist_id'] ? '♥' : '♡' ?>
                 </button>
                     <?php
-                    if (!empty($row["image_data"])): ?>
-                        <img src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
+                    if (!empty($row["has_image"])): ?>
+                        <img loading="lazy" src="image.php?id=<?php echo $row['id']; ?>" alt="<?php echo htmlspecialchars($row['name']); ?>">
                     <?php else: ?>
                         <img src="images/default.webp" alt="No Image">
                     <?php endif; ?>
@@ -77,12 +74,16 @@ include('header.php'); ?>
                         // Float → 1 decimal
                         $formatted = number_format($weight, 1);
                     }?>
-                    <h2><?php echo htmlspecialchars($row['name']) ." ". $formatted . " kg" ?></h2>
+                    <h2><a class="card-link" href="product.php?id=<?php echo (int) $row['id']; ?>"><?php echo htmlspecialchars($row['name']) ." ". $formatted . " kg" ?></a></h2>
                     <div class="price">֏<?php echo number_format($row['price'], 0); ?></div>
+                    <?php if ((int) $row['stock_quantity'] > 0): ?>
                     <form method="POST" action="add_to_cart.php">
                         <input type="hidden" name="product_id" value="<?php echo $row['id'] ?>">
                         <button type="submit">Quick add</button>
                     </form>
+                    <?php else: ?>
+                    <div class="out-of-stock">Out of stock</div>
+                    <?php endif; ?>
                 </div>
             <?php endwhile; ?>
         <?php else: ?>

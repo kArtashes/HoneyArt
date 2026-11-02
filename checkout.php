@@ -1,11 +1,8 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 
 require __DIR__ . '/order_mail.php';
 
-require_once __DIR__ . '/db.php';
 $userId = (int) ($_SESSION['user_id'] ?? 0);
 if (!$userId) {
     header('Location: logInReg.php');
@@ -19,7 +16,7 @@ if (empty($_SESSION['checkout_csrf_token'])) {
 function getCartItems(mysqli $conn, int $userId): array
 {
     $stmt = $conn->prepare(
-        'SELECT products.id, products.name, products.price, cart.quantity
+        'SELECT products.id, products.name, products.price, products.stock_quantity, products.is_hidden, cart.quantity
          FROM cart
          INNER JOIN products ON cart.product_id = products.id
          WHERE cart.user_id = ?
@@ -47,6 +44,28 @@ function getSavedAddresses(mysqli $conn, int $userId): array
     $stmt->close();
 
     return $addresses;
+}
+
+// Messages about basket items that can't be delivered in the wanted quantity
+function stockProblems(array $items): array
+{
+    $problems = [];
+    foreach ($items as $item) {
+        if ((int) $item['is_hidden'] === 1) {
+            $problems[] = '“' . $item['name'] . '” is no longer available. Please remove it from your basket.';
+            continue;
+        }
+
+        $stock = (int) $item['stock_quantity'];
+        if ((int) $item['quantity'] <= $stock) {
+            continue;
+        }
+        $problems[] = $stock > 0
+            ? 'Only ' . $stock . ' of “' . $item['name'] . '” left. Please reduce the quantity in your basket.'
+            : '“' . $item['name'] . '” is out of stock. Please remove it from your basket.';
+    }
+
+    return $problems;
 }
 
 $userStmt = $conn->prepare('SELECT username, email FROM users WHERE id = ?');
@@ -86,21 +105,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
 
         if (!$selectedAddress) {
             $error = 'Please select one of your saved addresses.';
+        } elseif ($problems = stockProblems($cartItems)) {
+            $error = implode(' ', $problems);
         } else {
             try {
+                $total = (int) array_sum(array_map(
+                    fn(array $item): int => (int) $item['price'] * (int) $item['quantity'],
+                    $cartItems
+                ));
+
                 $conn->begin_transaction();
+
                 $orderStmt = $conn->prepare(
-                    "INSERT INTO orders (user_id, product_id, quantity, unit_price, status) VALUES (?, ?, ?, ?, 'processing')"
+                    "INSERT INTO orders (user_id, status, total, stock_deducted, delivery_phone, delivery_city, delivery_region,
+                                         delivery_address_line1, delivery_address_line2, delivery_notes)
+                     VALUES (?, 'processing', ?, 1, ?, ?, ?, ?, ?, ?)"
+                );
+                $orderStmt->bind_param(
+                    'iissssss',
+                    $userId,
+                    $total,
+                    $selectedAddress['phone'],
+                    $selectedAddress['city'],
+                    $selectedAddress['region'],
+                    $selectedAddress['address_line1'],
+                    $selectedAddress['address_line2'],
+                    $selectedAddress['notes']
+                );
+                $orderStmt->execute();
+                $orderId = $conn->insert_id;
+                $orderStmt->close();
+
+                $itemStmt = $conn->prepare(
+                    'INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)'
+                );
+                // Takes the quantity only if it is still there, so two customers can't buy the last jar
+                $stockStmt = $conn->prepare(
+                    'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity >= ? AND is_hidden = 0'
                 );
 
-                foreach ($cartItems as $item) {
+                // Always the same product order, so two simultaneous checkouts can't block each other
+                $itemsByProduct = $cartItems;
+                usort($itemsByProduct, fn(array $a, array $b): int => (int) $a['id'] <=> (int) $b['id']);
+
+                foreach ($itemsByProduct as $item) {
                     $productId = (int) $item['id'];
                     $quantity = (int) $item['quantity'];
                     $unitPrice = (int) $item['price']; // price at the moment of purchase
-                    $orderStmt->bind_param('iiii', $userId, $productId, $quantity, $unitPrice);
-                    $orderStmt->execute();
+
+                    $stockStmt->bind_param('iii', $quantity, $productId, $quantity);
+                    $stockStmt->execute();
+                    if ($stockStmt->affected_rows !== 1) {
+                        throw new RuntimeException('out_of_stock');
+                    }
+
+                    $itemStmt->bind_param('iiii', $orderId, $productId, $quantity, $unitPrice);
+                    $itemStmt->execute();
                 }
-                $orderStmt->close();
+                $itemStmt->close();
+                $stockStmt->close();
 
                 $clearCartStmt = $conn->prepare('DELETE FROM cart WHERE user_id = ?');
                 $clearCartStmt->bind_param('i', $userId);
@@ -108,19 +171,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                 $clearCartStmt->close();
 
                 // The e-mail is sent in the background after the redirect (see below)
-                $total = array_sum(array_map(
-                    fn(array $item): float => (float) $item['price'] * (int) $item['quantity'],
-                    $cartItems
-                ));
-                queueOrderNotification($conn, $user, $selectedAddress, $cartItems, $total);
+                queueOrderNotification($conn, $user, $selectedAddress, $cartItems, $total, $orderId);
                 $conn->commit();
 
-                $_SESSION['checkout_flash'] = 'Your order has been placed successfully.';
+                $_SESSION['checkout_flash'] = 'Your order #' . $orderId . ' has been placed successfully.';
+                $_SESSION['checkout_order_id'] = $orderId;
                 header('Location: checkout.php');
                 exit;
             } catch (Throwable $e) {
                 $conn->rollback();
-                $error = 'Could not place your order. Please try again.';
+                if ($e->getMessage() === 'out_of_stock') {
+                    // Someone else was faster: show what is really left now
+                    $cartItems = getCartItems($conn, $userId);
+                    $error = implode(' ', stockProblems($cartItems));
+                } else {
+                    error_log('HoneyArt order failed: ' . $e->getMessage());
+                    $error = 'Could not place your order. Please try again.';
+                }
             }
         }
     }
@@ -131,7 +198,10 @@ $total = array_sum(array_map(
     $cartItems
 ));
 $successMessage = $_SESSION['checkout_flash'] ?? '';
-unset($_SESSION['checkout_flash']);
+$placedOrderId = (int) ($_SESSION['checkout_order_id'] ?? 0);
+unset($_SESSION['checkout_flash'], $_SESSION['checkout_order_id']);
+
+$stockWarnings = stockProblems($cartItems);
 
 $pageTitle = 'Checkout';
 include 'header.php';
@@ -144,7 +214,12 @@ include 'header.php';
     </div>
 
     <?php if ($successMessage): ?>
-        <p class="checkout-message success"><?= htmlspecialchars($successMessage) ?></p>
+        <p class="checkout-message success">
+            <?= htmlspecialchars($successMessage) ?>
+            <?php if ($placedOrderId): ?>
+                <a href="order.php?id=<?= $placedOrderId ?>">View your order</a>
+            <?php endif; ?>
+        </p>
         <script>
             // Send the order e-mail without making the customer wait for it
             fetch('send_order_notifications.php', { method: 'POST', keepalive: true, credentials: 'same-origin' })
@@ -152,6 +227,8 @@ include 'header.php';
         </script>
     <?php elseif ($error): ?>
         <p class="checkout-message error"><?= htmlspecialchars($error) ?></p>
+    <?php elseif ($stockWarnings): ?>
+        <p class="checkout-message error"><?= htmlspecialchars(implode(' ', $stockWarnings)) ?></p>
     <?php endif; ?>
 
     <?php if (!$cartItems && !$successMessage): ?>
@@ -160,7 +237,7 @@ include 'header.php';
             <a class="checkout-button" href="products.php">Browse products</a>
         </section>
     <?php elseif ($cartItems): ?>
-        <form method="POST" class="checkout-layout">
+        <form method="POST" class="checkout-layout" id="checkout-order-form">
             <section class="checkout-card">
                 <h2>Delivery address</h2>
                 <?php if ($addresses): ?>
@@ -196,7 +273,7 @@ include 'header.php';
                 <div class="checkout-total">
                     <span>Total</span><strong>֏<?= number_format($total, 0) ?></strong>
                 </div>
-                <?php if ($addresses): ?>
+                <?php if ($addresses && !$stockWarnings): ?>
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['checkout_csrf_token']) ?>">
                     <button type="submit" name="place_order" class="checkout-button">Place order</button>
                 <?php endif; ?>
@@ -224,9 +301,25 @@ include 'header.php';
     .order-summary .checkout-button { width: 100%; }
     .checkout-message { padding: 13px 16px; border-radius: 8px; margin-bottom: 20px; }
     .checkout-message.success { background: #e6f4ea; color: #217a3c; }
+    .checkout-message a { color: inherit; font-weight: 600; }
     .checkout-message.error { background: #fde7e7; color: #b42318; }
     .empty-checkout { text-align: center; }
     @media (max-width: 760px) { .checkout-layout { grid-template-columns: 1fr; } }
 </style>
+
+<script>
+    // A double click must not send the order twice
+    (function () {
+        const form = document.getElementById('checkout-order-form');
+        if (!form) return;
+        let sent = false;
+        form.addEventListener('submit', (event) => {
+            if (sent) event.preventDefault();
+            sent = true;
+        });
+        // Coming back with the browser's Back button: the form can be sent again
+        window.addEventListener('pageshow', () => { sent = false; });
+    })();
+</script>
 
 <?php include 'footer.php'; ?>

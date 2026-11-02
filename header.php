@@ -1,21 +1,19 @@
 <?php
-// The session must start before any HTML is sent (otherwise it fails on servers without output buffering)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session and login must be ready before any HTML is sent (they fail on servers without output buffering)
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/asset.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="HoneyArt: pure, natural Armenian honey from mountain valleys and forests.">
+    <link rel="icon" href="images/header_logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Intel+One+Mono:ital,wght@0,300..700;1,300..700&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cinzel:wght@700&display=swap" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wght@12..36,300..900&family=Playfair+Display:wght@400;700&family=Cinzel:wght@700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo asset('header.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('logInReg.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset('footer.css'); ?>">
@@ -30,20 +28,21 @@ require_once __DIR__ . '/asset.php';
     <?php foreach ($pageStyles ?? [] as $pageStyle): ?>
     <link rel="stylesheet" href="<?php echo asset($pageStyle); ?>">
     <?php endforeach; ?>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="format-detection" content="telephone=no">
     <?php // Each page can set $pageTitle before including header.php ?>
     <title><?php echo htmlspecialchars(!empty($pageTitle) ? $pageTitle . ' | HoneyArt' : 'HoneyArt — Pure Armenian Honey'); ?></title>
 </head>
 <body>
+    <?php if (!empty($_SESSION['basket_flash'])): ?>
+        <div id="basket-toast" role="status"><?php echo htmlspecialchars($_SESSION['basket_flash']); ?></div>
+        <?php unset($_SESSION['basket_flash']); ?>
+    <?php endif; ?>
     <header>
         <div id="header">
             
             <div id="header_menu">
                 <div id="section-0">
-                    <div id="hamburger" onclick="openMenu()"><img src="./images/burgerManu.png" alt=""></div>
-                    <div id="mobile-search"><img src="./images/search-icon.png" alt="" onclick="searchShow()"></div>
+                    <div id="hamburger" onclick="openMenu()" role="button" aria-label="Open menu"><img src="./images/burgerManu.png" alt=""></div>
+                    <div id="mobile-search" role="button" aria-label="Search" onclick="searchShow()"><img src="./images/search-icon.png" alt=""></div>
                 </div>
 
                 <div id="section-1">
@@ -58,17 +57,13 @@ require_once __DIR__ . '/asset.php';
                 </a>
 
                 <div id="section-2">
-                    <button class="desktop-search" onclick="searchShow()"><img id="search-icon" src="./images/search-icon.png" alt=""></button>
-                    <button class="basket-icon" onclick="openBasket()"><img id="basket-icon" src="./images/basket.png" alt=""></button>
-                    <button onclick="window.location.href='account.php'"><img id="account-icon" src="./images/personalAccount.png" alt=""></button>
+                    <button class="desktop-search" onclick="searchShow()" aria-label="Search"><img id="search-icon" src="./images/search-icon.png" alt=""></button>
+                    <button class="basket-icon" onclick="openBasket()" aria-label="Open basket"><img id="basket-icon" src="./images/basket.png" alt=""></button>
+                    <button onclick="window.location.href='account.php'" aria-label="My account"><img id="account-icon" src="./images/personalAccount.png" alt=""></button>
                 </div>
             </div>
         </div>
     </header>
-
-    <?php 
-        require_once __DIR__ . '/db.php';
-    ?>
 
 
     <!-- Overlay -->
@@ -118,26 +113,9 @@ require_once __DIR__ . '/asset.php';
             include('cart.php');
         ?>
         <div class="basket-footer">
-            <?php
-                $basket_user_id = $_SESSION['user_id'] ?? 0;
-                if ($basket_user_id) {
-                    $hi = $conn->query("
-                    SELECT SUM(products.price * cart.quantity) AS total_price
-                    FROM cart
-                    INNER JOIN products ON cart.product_id = products.id
-                    WHERE cart.user_id = $basket_user_id
-                    ");
-                    $ola = $hi->fetch_assoc();
-                    $total_price = $ola['total_price'] ?? 0;
-                }
-            ?>
             <div class="cart-summary"><span>Subtotal</span> <span class="total-price">֏<?php echo number_format($total_price, 0); ?></span></div>            
 
 
-            <?php
-                $free_shipping_limit = 40000;
-                $amount_left = max($free_shipping_limit - $total_price, 0);
-            ?>
             <form action="checkout.php" method="get" id="checkout-form">
                 <button type="submit" class="checkout-btn">CHECK OUT</button>
             </form>
@@ -186,6 +164,77 @@ require_once __DIR__ . '/asset.php';
         }
         
 
+        function showBasketToast(text) {
+            const oldToast = document.getElementById('basket-toast');
+            if (oldToast) oldToast.remove();
+            const toast = document.createElement('div');
+            toast.id = 'basket-toast';
+            toast.setAttribute('role', 'status');
+            toast.textContent = text;
+            document.body.appendChild(toast);
+        }
+
+        // Subtotal, item count and the free-shipping line of the basket panel
+        function updateBasketTotals(cart_count, total_price) {
+            const totalPriceEl = document.querySelector('.total-price');
+            if (totalPriceEl) totalPriceEl.textContent = '֏' + total_price.toLocaleString('en-US');
+
+            const basketCountEl = document.querySelector('.basket-count');
+            if (basketCountEl) basketCountEl.textContent = cart_count + ' items';
+
+            const freeShippingLimit = 40000;
+            const freeBlock = document.querySelector('.free-sheeping-block');
+            if (!freeBlock) return;
+
+            const successMsg = freeBlock.querySelector('.free-sheeping-success');
+            const defaultMsg = freeBlock.querySelector('.free-sheeping-default');
+            const numInDefMs = freeBlock.querySelector('.free-sheeping-default span');
+            const progressEl = freeBlock.querySelector('progress');
+
+            if (total_price >= freeShippingLimit) {
+                if (successMsg) successMsg.style.display = 'inline';
+                if (defaultMsg) defaultMsg.style.display = 'none';
+            } else {
+                if (successMsg) successMsg.style.display = 'none';
+                if (defaultMsg) defaultMsg.style.display = 'inline';
+                if (numInDefMs) numInDefMs.textContent = (freeShippingLimit - total_price).toLocaleString('en-US');
+            }
+
+            if (progressEl) progressEl.value = total_price;
+        }
+
+        // "Quick add" / "Add to basket" without leaving the page.
+        // If this fails for any reason, the form is simply sent the normal way.
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (form.getAttribute('action') !== 'add_to_cart.php') return;
+            event.preventDefault();
+
+            const button = form.querySelector('button');
+            if (button) button.disabled = true;
+
+            fetch('add_to_cart.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'fetch' },
+                credentials: 'same-origin',
+                body: new FormData(form)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.login_required) {
+                        window.location.href = 'logInReg.php?error=login_required';
+                        return;
+                    }
+                    showBasketToast(data.message);
+                    if (data.basket_html) {
+                        document.getElementById('basket-products').outerHTML = data.basket_html;
+                        updateBasketTotals(data.cart_count, data.total_price);
+                    }
+                })
+                .catch(() => form.submit())
+                .finally(() => { if (button) button.disabled = false; });
+        });
+
         // Quantity and Remove buttons
         function updateQuantity(productId, action, itemDiv) {
             const xhr = new XMLHttpRequest();
@@ -200,46 +249,20 @@ require_once __DIR__ . '/asset.php';
                     return;
                 }
 
-                const quantity = parseInt(data.quantity) || 0;
-                const cart_count = parseInt(data.cart_count) || 0;
-                const total_price = parseFloat(data.total_price) || 0;
+                if (data.stock_limit) {
+                    showBasketToast('No more in stock');
+                }
 
-                // Update total price
-                const totalPriceEl = document.querySelector('.total-price');
-                if (totalPriceEl) totalPriceEl.textContent = '֏' + total_price.toLocaleString('en-US');
+                const quantity = parseInt(data.quantity) || 0;
+
+                updateBasketTotals(parseInt(data.cart_count) || 0, parseFloat(data.total_price) || 0);
 
                 // Update item quantity or remove
                 if (quantity === 0 || action === 'remove') {
-                    itemDiv.remove();
+                    itemDiv.closest('.basket-item').remove();
                 } else {
                     const qtyEl = itemDiv.querySelector('.qty-value');
                     if (qtyEl) qtyEl.textContent = quantity;
-                }
-
-                // Update basket count display
-                const basketCountEl = document.querySelector('.basket-count');
-                if (basketCountEl) basketCountEl.textContent = cart_count + ' items';
-
-                const freeShippingLimit = 40000;
-
-                // Update free shipping text
-                const freeBlock = document.querySelector('.free-sheeping-block');
-                if (freeBlock) {
-                    const successMsg = freeBlock.querySelector('.free-sheeping-success');
-                    const defaultMsg = freeBlock.querySelector('.free-sheeping-default');
-                    const numInDefMs = freeBlock.querySelector('.free-sheeping-default span');
-                    const progressEl = freeBlock.querySelector('progress');
-
-                    if (total_price >= freeShippingLimit) {
-                        if (successMsg) successMsg.style.display = 'inline';
-                        if (defaultMsg) defaultMsg.style.display = 'none';
-                    } else {
-                        if (successMsg) successMsg.style.display = 'none';
-                        if (defaultMsg) defaultMsg.style.display = 'inline';
-                        if (numInDefMs) numInDefMs.textContent = (freeShippingLimit - total_price).toLocaleString('en-US');
-                    }
-
-                    if (progressEl) progressEl.value = total_price;
                 }
             };
             xhr.send('product_id=' + productId + '&action=' + action);

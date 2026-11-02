@@ -1,9 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/auth.php';
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/login_limiter.php';
 
 
 
@@ -12,12 +10,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$username = trim($_POST['username'] ?? '');
-$email = trim($_POST['email'] ?? '');
-$plainPassword = $_POST['password'] ?? '';
+$username = requestString($_POST, 'username');
+$email = requestString($_POST, 'email');
+$plainPassword = requestString($_POST, 'password', false);
 
-if ($username === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($plainPassword) < 8) {
+// Limits match the users table: username 60, email 255 characters
+if ($username === '' || mb_strlen($username) > 60 || !filter_var($email, FILTER_VALIDATE_EMAIL)
+    || mb_strlen($email) > 255 || !passwordLengthOk($plainPassword)) {
     header('Location: logInReg.php?error=register_invalid');
+    exit();
+}
+
+// Stops bots from creating accounts in bulk (10 per IP address in 15 minutes)
+if (tooManyLoginAttempts($conn, 'register', $email)) {
+    header('Location: logInReg.php?error=too_many');
+    exit();
+}
+recordAttempt($conn, 'register', $email);
+
+$checkStmt = $conn->prepare('SELECT 1 FROM users WHERE email = ?');
+$checkStmt->bind_param('s', $email);
+$checkStmt->execute();
+$emailTaken = $checkStmt->get_result()->num_rows > 0;
+$checkStmt->close();
+
+if ($emailTaken) {
+    header('Location: logInReg.php?error=email_taken');
     exit();
 }
 
@@ -29,13 +47,16 @@ try {
     $newUserId = $conn->insert_id;
     $stmt->close();
 
-    session_regenerate_id(true);
-    $_SESSION['loggedIn'] = true;
-    $_SESSION['user_id'] = $newUserId;
-    $_SESSION['email'] = $email;
+    logInCustomer(['id' => $newUserId, 'email' => $email, 'password' => $passwordHash]);
     header('Location: account.php');
     exit();
 } catch (mysqli_sql_exception $e) {
-    header('Location: logInReg.php?error=email_taken');
+    if ($e->getCode() === 1062) {
+        // Two sign-ups with one e-mail at the same moment
+        header('Location: logInReg.php?error=email_taken');
+        exit();
+    }
+    error_log('HoneyArt registration failed: ' . $e->getMessage());
+    header('Location: logInReg.php?error=register_failed');
     exit();
 }

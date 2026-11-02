@@ -20,7 +20,7 @@ if (isset($_POST['save'])) {
     $name = trim((string) ($_POST['name'] ?? ''));
     $description = trim((string) ($_POST['description'] ?? ''));
     $price = (float) ($_POST['price'] ?? 0);
-    $stock_quantity = (int) ($_POST['stock_quantity'] ?? 0);
+    $stock_quantity = max(0, (int) ($_POST['stock_quantity'] ?? 0));
     $category = trim((string) ($_POST['category'] ?? ''));
     $weight_kg = (float) ($_POST['weight_kg'] ?? 0);
 
@@ -126,7 +126,36 @@ if (isset($_POST['save'])) {
 if (isset($_GET['delete'])) {
     requireAdminCsrf($_GET['token'] ?? null);
     $id = (int) $_GET['delete'];
-    $conn->query("DELETE FROM products WHERE id=$id");
+    try {
+        $conn->begin_transaction();
+        // Its pictures and customers' baskets / viewing history go with it
+        foreach (['DELETE FROM product_images WHERE product_id = ?', 'DELETE FROM cart WHERE product_id = ?',
+                  'DELETE FROM recently_viewed WHERE product_id = ?', 'DELETE FROM products WHERE id = ?'] as $sql) {
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $stmt->close();
+        }
+        $conn->commit();
+        $_SESSION['admin_flash'] = ['type' => 'success', 'text' => 'Product deleted.'];
+    } catch (mysqli_sql_exception $e) {
+        // Orders keep a link to their product, so an ordered product can't be removed
+        $conn->rollback();
+        $_SESSION['admin_flash'] = ['type' => 'error', 'text' => 'This product has orders, so it cannot be deleted. Use Hide to remove it from the shop.'];
+    }
+    header("Location: admin_add_product.php");
+    exit;
+}
+
+// Hide a product from the shop, or show it again
+if (isset($_GET['toggle_hidden'])) {
+    requireAdminCsrf($_GET['token'] ?? null);
+    $id = (int) $_GET['toggle_hidden'];
+    $stmt = $conn->prepare('UPDATE products SET is_hidden = 1 - is_hidden WHERE id = ?');
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    $stmt->close();
+    $_SESSION['admin_flash'] = ['type' => 'success', 'text' => 'Product updated.'];
     header("Location: admin_add_product.php");
     exit;
 }
@@ -140,13 +169,15 @@ if (isset($_GET['edit'])) {
 }
 
 // Fetch all products
-$result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
+$result = $conn->query("SELECT id, name, weight_kg, price, stock_quantity, is_hidden, category, (image_data IS NOT NULL) AS has_image FROM products ORDER BY created_at DESC");
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
     <title>Admin Panel - HoneyArt</title>
     <style>
         body {
@@ -201,6 +232,11 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
             text-decoration: none;
         }
 
+        .hidden-label { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #eee; color: #666; font-size: 12px; }
+        .message { padding: 12px 14px; border-radius: 5px; }
+        .message.success { background: #e6f4ea; color: #217a3c; }
+        .message.error { background: #fde7e7; color: #b42318; }
+
         /* Inputs include their padding, so they don't stick out of the form */
         form input, form textarea {
             box-sizing: border-box;
@@ -237,6 +273,9 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
 <body>
 
 <h1>Admin Panel - HoneyArt</h1>
+<?php if (!empty($_SESSION['admin_flash'])): $flash = $_SESSION['admin_flash']; unset($_SESSION['admin_flash']); ?>
+    <p class="message <?php echo $flash['type'] === 'success' ? 'success' : 'error'; ?>"><?php echo htmlspecialchars($flash['text']); ?></p>
+<?php endif; ?>
 <p><a href="adminlogout.php">Logout</a> | <a href="admin_add_blog.php">Add blog</a> | <a href="admin_orders.php">Orders</a></p>
 
 <h2><?php echo $product ? "Edit Product" : "Add New Product"; ?></h2>
@@ -247,7 +286,7 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
     <input type="text" name="name" placeholder="Product Name" required value="<?php echo htmlspecialchars($product['name'] ?? ''); ?>">
     <textarea name="description" placeholder="Description"><?php echo htmlspecialchars($product['description'] ?? ''); ?></textarea>
     <input type="number" step="0.01" name="price" placeholder="Price" required value="<?php echo $product['price'] ?? ''; ?>">
-    <input type="number" name="stock_quantity" placeholder="Stock Quantity" value="<?php echo $product['stock_quantity'] ?? ''; ?>">
+    <input type="number" name="stock_quantity" placeholder="Stock Quantity" min="0" required value="<?php echo $product['stock_quantity'] ?? ''; ?>">
     <input type="number" step="0.01" name="weight_kg" placeholder="Weight (kg)" value="<?php echo $product['weight_kg'] ?? ''; ?>">
     <input type="text" name="category" placeholder="Category" value="<?php echo htmlspecialchars($product['category'] ?? ''); ?>">
 
@@ -297,19 +336,25 @@ $result = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
         <?php while ($row = $result->fetch_assoc()): ?>
             <tr>
                 <td>
-                    <?php if (!empty($row["image_data"])): ?>
+                    <?php if (!empty($row["has_image"])): ?>
                         <img src="image.php?id=<?php echo $row["id"]; ?>" class="thumbnail" />
                     <?php else: ?>
                         No Image
                     <?php endif; ?>
                 </td>
-                <td><?php echo htmlspecialchars($row["name"]); ?></td>
+                <td>
+                    <?php echo htmlspecialchars($row["name"]); ?>
+                    <?php if ((int) $row["is_hidden"] === 1): ?>
+                        <span class="hidden-label">Hidden</span>
+                    <?php endif; ?>
+                </td>
                 <td><?php echo htmlspecialchars($row["weight_kg"]); ?></td>
                 <td><?php echo htmlspecialchars($row["price"]); ?></td>
                 <td><?php echo htmlspecialchars($row["stock_quantity"]); ?></td>
-                <td><?php echo htmlspecialchars($row["category"]); ?></td>
+                <td><?php echo htmlspecialchars($row["category"] ?? ''); ?></td>
                 <td>
                     <a href="admin_add_product.php?edit=<?php echo $row["id"]; ?>">Edit</a> |
+                    <a href="admin_add_product.php?toggle_hidden=<?php echo (int) $row["id"]; ?>&token=<?php echo urlencode(adminCsrfToken()); ?>"><?php echo (int) $row["is_hidden"] === 1 ? 'Show' : 'Hide'; ?></a> |
                     <a href="admin_add_product.php?delete=<?php echo (int) $row["id"]; ?>&token=<?php echo urlencode(adminCsrfToken()); ?>" onclick="return confirm('Delete this product?')">Delete</a>
                 </td>
             </tr>
